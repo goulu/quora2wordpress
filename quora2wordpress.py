@@ -1,9 +1,9 @@
-import os
-import time
-import json
+import os, time, re, json, requests, base64, lxml #standard libraries
+from itertools import groupby
 
 # This is the Quora profile page you want to scrape
 page="https://fr.quora.com/profile/Philippe-Guglielmetti/answers"
+page="https://reponsesfrequentes.quora.com/"
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -13,7 +13,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from bs4 import BeautifulSoup
 
-browser = webdriver.Chrome()
+options = webdriver.ChromeOptions()
+options.add_experimental_option('excludeSwitches', ['enable-logging'])
+browser = webdriver.Chrome(options=options)
 
 # This is the file where the scraped HTML will be saved
 # If the file exists, the script will use it instead of scraping the page again
@@ -36,28 +38,32 @@ if not os.path.isfile(listfile) :
     print("scraping",page,"to",listfile)
     scrapelist(page)
 
-with open(listfile, "r") as file:
+with open(listfile, "r", encoding="utf8", errors="surrogateescape") as file:
     html = file.read()
 
 print("this might take some time...", end="")
 soup = BeautifulSoup(html, 'lxml')
 
-# Find and process the questions+answers
+# Find links to all  posts
+regex = re.compile(page+r'.+')
 
-questions = soup.findAll("div",{"class":"q-box qu-pt--medium qu-pb--medium qu-borderBottom"})
-if questions is None or len(questions)==0:
-    print("no questions found")
+links = soup.findAll('a', href = regex)
+
+links=[x.get('href') for x in links]
+if links is None or len(links)==0:
+    print("no post found")
     quit()
-print(len(questions),"questions found")
+links=[key for key, _group in groupby(links)] # remove duplicates https://stackoverflow.com/a/5738933/1395973
+print(len(links),"posts found")
+print('\n'.join(links))
 
-def formatAnswer(answer):
-    paragraphs = answer.findAll("p")
-    output = ""
-    for p in paragraphs:
-        output += "<p>"+p.text+"</p>\n"
+def Paragraph(p,tag="p"):
+    output=p.text
+    if tag:
+        output = "<"+tag+">"+output+"</"+tag+">\n"
     return output
 
-def scrapeAnswer(page):
+def scrapePost(page):
     browser.get(page)
     WebDriverWait(browser, 30).until(
         EC.presence_of_element_located((By.TAG_NAME, "body")) 
@@ -65,25 +71,24 @@ def scrapeAnswer(page):
     time.sleep(0.1)
     soup = BeautifulSoup(browser.page_source, 'lxml')
     body= soup.find('body')
-    title = body.find("div",{"class":"q-box qu-mb--medium qu-mt--small"})
-    if title is  None: # in a Space ?
-        title = body.find("div",{"class":"q-box qu-mb--tiny"})
-        answer=title.next_sibling
-    else:
-        answer= body.findAll("span",{"class":"q-box qu-userSelect--text"})[1]
+    root=body.find(attrs={"id":"root"})
+    paragraphs= root.findAll("p")
+    title = Paragraph(paragraphs[0],tag=None)
+    content=''.join([Paragraph(p) for p in paragraphs[1:]])
 
     article = {
+        'url' : page,
         'title' : title.text,
-        'content' : formatAnswer(answer),
+        'content' : content,
         "status" : "draft"
         }
     return article
 
 articles = []
 try:
-    for question in questions:
-        link=question.find("a",{"class":"answer_timestamp"})['href']
-        article = scrapeAnswer(link)
+    for link in links:
+        print("scraping",link,end='...')
+        article = scrapePost(link)
         print(article['title'])
         articles.append(article)
 finally:
