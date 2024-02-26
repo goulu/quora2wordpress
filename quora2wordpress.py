@@ -55,13 +55,27 @@ if links is None or len(links)==0:
     quit()
 links=[key for key, _group in groupby(links)] # remove duplicates https://stackoverflow.com/a/5738933/1395973
 print(len(links),"posts found")
-print('\n'.join(links))
 
-def Paragraph(p,tag="p"):
-    output=p.text
+def Recurse(parent,tag):
+    content=''
+    if tag=='a':
+        return '<a href="'+parent.get('href')+'">'+parent.text+'</a>'
+    if tag=='img':
+        #TODO : upoad the image to wordpress
+        return '<img src="'+parent.get('src')+'"/>'
+    if tag=='svg' : # ignore svg
+        return ''
+    if tag=='span':
+        # add bold/italic detection one day, in this case we will keep the span
+        tag=None #ignore because spans are contiguous blocks in Quora
+    try:
+        for child in parent.children :
+            content+=Recurse(child,child.name) 
+    except:
+        content=parent.text # no children
     if tag:
-        output = "<"+tag+">"+output+"</"+tag+">\n"
-    return output
+        content = "<"+tag+">"+content+"</"+tag+">\n"
+    return content
 
 def scrapePost(page):
     browser.get(page)
@@ -73,12 +87,12 @@ def scrapePost(page):
     body= soup.find('body')
     root=body.find(attrs={"id":"root"})
     paragraphs= root.findAll("p")
-    title = Paragraph(paragraphs[0],tag=None)
-    content=''.join([Paragraph(p) for p in paragraphs[1:]])
+    title = Recurse(paragraphs[0],tag=None) # ignore any tag in title (is it right ?)
+    content=''.join([Recurse(p,'p') for p in paragraphs[1:]])
 
     article = {
         'url' : page,
-        'title' : title.text,
+        'title' : title,
         'content' : content,
         "status" : "draft"
         }
