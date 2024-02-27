@@ -62,9 +62,10 @@ print(len(links),"posts found")
 rewikipedia=[re.compile(r"https:\/\/(.*).wikipedia.org\/wiki\/(.*)"),
              re.compile(r"https:\/\/(.*).wikipedia.org\/w\/index.php\?title=(.*)&a")]
 
-def Recurse(element,tag):
+def Recurse(element):
     if isinstance(element,NavigableString): 
         return element.text # no children
+    tag=element.name
     # process some tags
     if tag=='a':
         href=element.get('href')
@@ -85,9 +86,9 @@ def Recurse(element,tag):
         pass
     if tag=='span':
         # add bold/italic detection one day, in this case we will keep the span
-        tag=None #ignore because spans are contiguous blocks in Quora
+        tag=None #ignore because spans are inline blocks in Quora
 
-    content= ''.join([Recurse(child,child.name) for child in element.children])
+    content= ''.join([Recurse(child) for child in element.children])
     if tag:
         content = "<"+tag+">"+content+"</"+tag+">"
     return content
@@ -101,9 +102,10 @@ def scrapePost(page):
     soup = BeautifulSoup(browser.page_source, 'lxml')
     body= soup.find('body')
     root=body.find(attrs={"id":"root"})
-    paragraphs= root.findAll("p")
-    title = Recurse(paragraphs[0],tag=None) # ignore any tag in title (is it right ?)
-    content=''.join([Recurse(p,'p') for p in paragraphs[1:]])
+    firstp=root.find("p") # first paragraph is the title
+    paragraphs= firstp.parent.findAll(["p","blockquote","img"])
+    title = paragraphs[0].text # ignore any tag in title (is it right ?)
+    content=''.join([Recurse(p) for p in paragraphs[1:]])
 
     article = {
         'url' : page,
