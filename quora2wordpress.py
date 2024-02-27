@@ -1,9 +1,12 @@
-import os, time, re, json, requests, base64, lxml #standard libraries
-from itertools import groupby
 
-# This is the Quora profile page you want to scrape
+
+# This is the Quora profile page or space you want to scrape
 page="https://fr.quora.com/profile/Philippe-Guglielmetti/answers"
 page="https://reponsesfrequentes.quora.com/"
+reference2wiki=True # true if yuour WP uses https://wordpress.org/plugins/reference-2-wiki/
+
+import os, time, re, json, requests, base64, lxml #standard libraries
+from itertools import groupby
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -11,7 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
@@ -56,25 +59,37 @@ if links is None or len(links)==0:
 links=[key for key, _group in groupby(links)] # remove duplicates https://stackoverflow.com/a/5738933/1395973
 print(len(links),"posts found")
 
-def Recurse(parent,tag):
-    content=''
+rewikipedia=[re.compile(r"https:\/\/(.*).wikipedia.org\/wiki\/(.*)"),
+             re.compile(r"https:\/\/(.*).wikipedia.org\/w\/index.php\?title=(.*)&a")]
+
+def Recurse(element,tag):
+    if isinstance(element,NavigableString): 
+        return element.text # no children
+    # process some tags
     if tag=='a':
-        return '<a href="'+parent.get('href')+'">'+parent.text+'</a>'
+        href=element.get('href')
+        if reference2wiki:
+            for regex in rewikipedia:
+                m=re.match(regex,href)
+                if m:
+                    groups=list(m.groups())
+                    groups.append(element.text)
+                    return '[['+'|'.join(groups)+']]'
+        return '<a href="'+href+'">'+element.text+'</a>'
     if tag=='img':
         #TODO : upoad the image to wordpress
-        return '<img src="'+parent.get('src')+'"/>'
+        return '<img src="'+element.get('src')+'"/>'
     if tag=='svg' : # ignore svg
         return ''
+    if tag=='blockquote':
+        pass
     if tag=='span':
         # add bold/italic detection one day, in this case we will keep the span
         tag=None #ignore because spans are contiguous blocks in Quora
-    try:
-        for child in parent.children :
-            content+=Recurse(child,child.name) 
-    except:
-        content=parent.text # no children
+
+    content= ''.join([Recurse(child,child.name) for child in element.children])
     if tag:
-        content = "<"+tag+">"+content+"</"+tag+">\n"
+        content = "<"+tag+">"+content+"</"+tag+">"
     return content
 
 def scrapePost(page):
