@@ -1,11 +1,16 @@
+import re
 
-
-# This is the Quora profile page or space you want to scrape
+# This is the Quora profile page you want to scrape
 page="https://fr.quora.com/profile/Philippe-Guglielmetti/answers"
-page="https://reponsesfrequentes.quora.com/"
+regex = re.compile('https://fr.quora.com/.*/answer/Philippe-Guglielmetti')
+
+# if you want to scrape a Space, uncomment the following 2 lines
+# page="https://reponsesfrequentes.quora.com/"
+# regex = re.compile(page+r'.+')
+
 reference2wiki=True # true if yuour WP uses https://wordpress.org/plugins/reference-2-wiki/
 
-import os, time, re, json, requests, base64, lxml #standard libraries
+import os, time, json, requests, base64, lxml #standard libraries
 from itertools import groupby
 
 from selenium import webdriver
@@ -29,7 +34,7 @@ def scrapelist(page):
     browser.get(page)
     time.sleep(1)
     elem = browser.find_element(By.TAG_NAME,"body")
-    no_of_pagedowns = 20
+    no_of_pagedowns = 2
     while no_of_pagedowns:
         elem.send_keys(Keys.PAGE_DOWN)
         time.sleep(0.5)
@@ -48,7 +53,6 @@ print("this might take some time...", end="")
 soup = BeautifulSoup(html, 'lxml')
 
 # Find links to all  posts
-regex = re.compile(page+r'.+')
 
 links = soup.findAll('a', href = regex)
 
@@ -62,34 +66,33 @@ print(len(links),"posts found")
 rewikipedia=[re.compile(r"https:\/\/(.*).wikipedia.org\/wiki\/(.*)"),
              re.compile(r"https:\/\/(.*).wikipedia.org\/w\/index.php\?title=(.*)&a")]
 
-def Recurse(element):
+def Recurse(element,notag=False):
     if isinstance(element,NavigableString): 
         return element.text # no children
     tag=element.name
     # process some tags
     if tag=='a':
         href=element.get('href')
+        text=''.join(element.findAll(text=True, recursive=False))
         if reference2wiki:
             for regex in rewikipedia:
                 m=re.match(regex,href)
                 if m:
                     groups=list(m.groups())
-                    groups.append(element.text)
+                    groups.append(text)
                     return '[['+'|'.join(groups)+']]'
-        return '<a href="'+href+'">'+element.text+'</a>'
+        return '<a href="'+href+'">'+text+'</a>'
     if tag=='img':
         #TODO : upoad the image to wordpress
         return '<img src="'+element.get('src')+'"/>'
     if tag=='svg' : # ignore svg
         return ''
-    if tag=='blockquote':
-        pass
     if tag=='span':
         # add bold/italic detection one day, in this case we will keep the span
         tag=None #ignore because spans are inline blocks in Quora
 
     content= ''.join([Recurse(child) for child in element.children])
-    if tag:
+    if not notag and tag and content:
         content = "<"+tag+">"+content+"</"+tag+">"
     return content
 
@@ -98,14 +101,20 @@ def scrapePost(page):
     WebDriverWait(browser, 30).until(
         EC.presence_of_element_located((By.TAG_NAME, "body")) 
     )
-    time.sleep(0.1)
+    time.sleep(1)
     soup = BeautifulSoup(browser.page_source, 'lxml')
     body= soup.find('body')
-    root=body.find(attrs={"id":"root"})
-    firstp=root.find("p") # first paragraph is the title
-    paragraphs= firstp.parent.findAll(["p","blockquote","img"])
-    title = paragraphs[0].text # ignore any tag in title (is it right ?)
-    content=''.join([Recurse(p) for p in paragraphs[1:]])
+    root=body.find(attrs={"id":"mainContent"})
+    if root: # we are on an answer page
+        root=root.select_one('div:first-child')
+        root=root.select_one('div:first-child')
+        root=root.select_one('div:first-child')
+        children=list(root.children)
+        title=children[0].text
+        # children[1] is header. TODO find the date there 
+        content=Recurse(children[2],True)
+    else:
+        raise Exception("unknown page type")
 
     article = {
         'url' : page,
