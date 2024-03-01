@@ -87,6 +87,8 @@ def Recurse(element,notag=False):
         return '<img src="'+element.get('src')+'"/>'
     if tag=='svg' : # ignore svg
         return ''
+    if tag=='div': 
+        tag=None #ignore
     if tag=='span':
         # add bold/italic detection one day, in this case we will keep the span
         tag=None #ignore because spans are inline blocks in Quora
@@ -105,15 +107,21 @@ def scrapePost(page):
     soup = BeautifulSoup(browser.page_source, 'lxml')
     body= soup.find('body')
     root=body.find(attrs={"id":"mainContent"})
-    if root: # we are on an answer page
+    try:
         root=root.select_one('div:first-child')
         root=root.select_one('div:first-child')
         root=root.select_one('div:first-child')
-        children=list(root.children)
-        title=children[0].text
-        # children[1] is header. TODO find the date there 
-        content=Recurse(children[2],True)
-    else:
+        span=root.find('span',{'class':'qu-userSelect--text'})
+        if span: # it is a space
+            children=list(span.children)
+            title=children.pop(0).text
+            content= ''.join([Recurse(child) for child in children])
+        else: # it is an answer
+            children=list(root.children)
+            title=children[0].text
+            # children[1] is header. TODO find the date there 
+            content=Recurse(children[2],True)
+    except:
         raise Exception("unknown page type")
 
     article = {
