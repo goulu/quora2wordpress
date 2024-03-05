@@ -100,10 +100,7 @@ def Recurse(element,notag=False):
 
 def scrapePost(page):
     browser.get(page)
-    WebDriverWait(browser, 30).until(
-        EC.presence_of_element_located((By.TAG_NAME, "body")) 
-    )
-    time.sleep(1)
+    browser.find_element(By.TAG_NAME,"body")
     soup = BeautifulSoup(browser.page_source, 'lxml')
     body= soup.find('body')
     root=body.find(attrs={"id":"mainContent"})
@@ -112,15 +109,25 @@ def scrapePost(page):
         root=root.select_one('div:first-child')
         root=root.select_one('div:first-child')
         span=root.find('span',{'class':'qu-userSelect--text'})
-        if span: # it is a space
-            children=list(span.children)
+        children=list(span.children)
+        if len(children)>1: # it is a space
             title=children.pop(0).text
             content= ''.join([Recurse(child) for child in children])
         else: # it is an answer
             children=list(root.children)
             title=children[0].text
-            # children[1] is header. TODO find the date there 
             content=Recurse(children[2],True)
+        # now get the date on the log page
+        browser.get(page+"/log")
+        browser.find_element(By.TAG_NAME,"body")
+        log = BeautifulSoup(browser.page_source, 'lxml')
+        text=log.text
+        redatetime=re.compile(r"([0-9]{1,2}) (\S*) ([0-9]{4}) à ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})") # french version
+        dates=list(re.findall(redatetime,text))
+        date=dates[-1]
+        month=date[1].replace("janvier","01").replace("février","02").replace("mars","03").replace("avril","04").replace("mai","05").replace("juin","06").replace("juillet","07").replace("août","08").replace("septembre","09").replace("octobre","10").replace("novembre","11").replace("décembre","12")
+        date=f'{date[0]}:{month}:{date[2]}T{date[3]}:{date[4]}:{date[5]}' #in WP format YYYY-MM-DDTHH:MM:SS according to https://core.trac.wordpress.org/ticket/41032
+
     except:
         raise Exception("unknown page type")
 
@@ -128,6 +135,7 @@ def scrapePost(page):
         'url' : page,
         'title' : title,
         'content' : content,
+        'date' : date,
         "status" : "draft"
         }
     return article
