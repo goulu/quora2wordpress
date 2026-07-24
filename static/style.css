@@ -1,0 +1,510 @@
+/* Quora to WordPress Web UI Stylesheet (Matching quora-importer) */
+
+:root {
+    --bg-dark: #11111b;
+    --card-bg: #1e1e2e;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --accent-blue: #89b4fa;
+    --accent-purple: #cba6f7;
+    --accent-red: #b92b27;
+    --text-main: #cdd6f4;
+    --text-muted: #a6adc8;
+    --text-heading: #ffffff;
+    --success-green: #a6e3a1;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 30px;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    min-height: 100vh;
+}
+
+.quora-importer-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Header Styling */
+.quora-importer-header {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #1e1e2f 0%, #11111b 100%);
+    padding: 25px 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--card-border);
+    margin-bottom: 25px;
+}
+
+.quora-logo-badge {
+    background: linear-gradient(135deg, #1565C0 0%, #b92b27 100%);
+    color: #ffffff;
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    font-weight: 800;
+    margin-right: 20px;
+    box-shadow: 0 4px 15px rgba(185, 43, 39, 0.4);
+    flex-shrink: 0;
+}
+
+.quora-header-text h1 {
+    color: var(--text-heading);
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+}
+
+.quora-header-text .description {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Main Container Card */
+.quora-importer-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--card-border);
+    padding: 35px;
+    min-height: 300px;
+}
+
+/* Steps Display logic */
+.quora-step {
+    display: none;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.quora-step.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Dropzone Styling */
+.quora-dropzone {
+    border: 2px dashed rgba(203, 166, 247, 0.35);
+    background: rgba(17, 17, 27, 0.5);
+    border-radius: 14px;
+    padding: 45px 25px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.quora-dropzone:hover, .quora-dropzone.dragover {
+    border-color: var(--accent-purple);
+    background: rgba(203, 166, 247, 0.08);
+    box-shadow: 0 0 25px rgba(203, 166, 247, 0.15);
+}
+
+.quora-dropzone-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.quora-upload-icon {
+    font-size: 52px;
+    color: var(--accent-blue);
+    margin-bottom: 18px;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.quora-dropzone:hover .quora-upload-icon {
+    transform: translateY(-6px);
+    color: var(--accent-purple);
+}
+
+.quora-dropzone h3 {
+    color: var(--text-heading);
+    font-size: 19px;
+    margin: 0 0 8px 0;
+}
+
+.quora-dropzone p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 20px 0;
+}
+
+.quora-browse-btn {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    color: #11111b;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(137, 180, 250, 0.3);
+    transition: all 0.2s ease;
+}
+
+.quora-browse-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(203, 166, 247, 0.4);
+}
+
+/* File Queue List */
+.quora-file-list-container {
+    margin-top: 25px;
+    background: rgba(17, 17, 27, 0.4);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.quora-file-list-container h4 {
+    margin: 0 0 15px 0;
+    color: var(--accent-purple);
+    font-size: 15px;
+}
+
+.quora-file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.quora-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quora-file-item .file-name {
+    font-weight: 600;
+    color: var(--text-heading);
+}
+
+.quora-file-item .file-size {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+.quora-file-item .remove-file-btn {
+    background: none;
+    border: none;
+    color: #f38ba8;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* Help Card */
+.quora-help-card {
+    background: rgba(137, 180, 250, 0.05);
+    border: 1px solid rgba(137, 180, 250, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 25px;
+}
+
+.quora-help-card h4 {
+    color: var(--accent-blue);
+    margin: 0 0 12px 0;
+    font-size: 15px;
+}
+
+.quora-help-card ol {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.quora-help-card li strong {
+    color: var(--text-main);
+}
+
+/* Form Options */
+.step-title {
+    color: var(--text-heading);
+    font-size: 20px;
+    margin: 0 0 6px 0;
+}
+
+.step-intro {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 25px 0;
+}
+
+.quora-form-section {
+    background: rgba(17, 17, 27, 0.4);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.quora-form-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--accent-purple);
+    font-size: 15px;
+}
+
+.quora-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+@media (max-width: 650px) {
+    .quora-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.quora-form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.quora-form-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 6px;
+}
+
+.quora-form-group input[type="text"],
+.quora-form-group input[type="email"] {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #ffffff;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.quora-form-group input:focus {
+    border-color: var(--accent-purple);
+}
+
+.help-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Checkbox options */
+.quora-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.quora-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+}
+
+.quora-checkbox-label input[type="checkbox"] {
+    accent-color: var(--accent-purple);
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.quora-checkbox-label strong {
+    display: block;
+    color: var(--text-heading);
+    font-size: 14px;
+}
+
+.quora-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 25px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    color: #11111b;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(137, 180, 250, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(203, 166, 247, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Progress & Terminal Log */
+.quora-progress-bar-wrap {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.quora-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    transition: width 0.3s ease;
+}
+
+.terminal-window {
+    background: #11111b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.terminal-header {
+    background: #181825;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+.dot.red { background: #f38ba8; }
+.dot.yellow { background: #f9e2af; }
+.dot.green { background: #a6e3a1; }
+
+.terminal-title {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: monospace;
+    margin-left: 10px;
+}
+
+.terminal-body {
+    padding: 15px;
+    margin: 0;
+    color: #a6e3a1;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Results & Download Items */
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.result-card {
+    background: rgba(17, 17, 27, 0.5);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.result-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.result-icon {
+    font-size: 32px;
+    color: var(--success-green);
+}
+
+.result-details h5 {
+    margin: 0 0 4px 0;
+    color: var(--text-heading);
+    font-size: 16px;
+}
+
+.result-details p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.btn-download {
+    background: linear-gradient(135deg, #a6e3a1 0%, #94e2d5 100%);
+    color: #11111b;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 20px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(166, 227, 161, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(166, 227, 161, 0.4);
+}
+
+.text-success {
+    color: var(--success-green);
+}

@@ -14,7 +14,19 @@ This project combines local conversion features and Quora command-line scraping 
    pip install -r requirements.txt
    ```
 
-## Usage
+## Web Interface
+
+You can launch a modern Web Interface (identical in design to the `quora-importer` WordPress plugin) allowing you to drag & drop `.zip` archives, configure all conversion options, watch live logs, and download generated WXR files directly:
+
+```bash
+# Launch the web interface (opens on http://localhost:5000 by default)
+python quora2wp.py --web
+
+# Or run directly via app.py
+python app.py
+```
+
+## CLI Usage
 
 The main script is `quora2wp.py`. It converts Quora export folders or `.zip` archives (containing an `index.html` file) into WordPress WXR XML files. By default, it automatically retrieves Quora topics, but comment scraping is disabled by default.
 

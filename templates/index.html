@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quora to WordPress WXR Converter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="quora-importer-wrap">
+        <!-- Header Banner -->
+        <div class="quora-importer-header">
+            <div class="quora-logo-badge">Q</div>
+            <div class="quora-header-text">
+                <h1>Quora to WordPress WXR Converter</h1>
+                <p class="description">Convertissez vos archives d'exportation Quora (.zip) en fichiers XML au format WordPress WXR (WordPress eXtended RSS).</p>
+            </div>
+        </div>
+
+        <!-- Main Card Container -->
+        <div class="quora-importer-card">
+            
+            <!-- STEP 1: UPLOAD SCREEN -->
+            <div id="quora-step-upload" class="quora-step active">
+                <div class="quora-dropzone" id="quora-dropzone">
+                    <div class="quora-dropzone-inner">
+                        <i class="fa-solid fa-cloud-arrow-up quora-upload-icon"></i>
+                        <h3>Glissez & déposez vos fichiers d'exportation ici</h3>
+                        <p>Sélectionnez un ou plusieurs fichiers d'archive Quora (.zip) pour commencer la conversion WXR.</p>
+                        <button class="quora-browse-btn" type="button" id="quora-browse-btn">
+                            <i class="fa-solid fa-folder-open"></i> Choisir des fichiers (.zip)
+                        </button>
+                        <input type="file" id="quora-file-input" accept=".zip" multiple style="display: none;" />
+                    </div>
+                </div>
+
+                <!-- Selected Files Queue -->
+                <div id="quora-file-list-container" class="quora-file-list-container" style="display: none;">
+                    <h4><i class="fa-solid fa-file-archive"></i> Fichiers sélectionnés pour conversion</h4>
+                    <ul id="quora-file-list" class="quora-file-list"></ul>
+                </div>
+
+                <!-- Help Card -->
+                <div class="quora-help-card">
+                    <h4><i class="fa-solid fa-circle-info"></i> Comment obtenir vos archives d'exportation Quora ?</h4>
+                    <ol>
+                        <li>Connectez-vous à Quora et accédez aux <strong>Paramètres du compte</strong>.</li>
+                        <li>Dans l'onglet <strong>Confidentialité</strong>, cliquez sur <strong>Télécharger vos données (Demander une archive)</strong>.</li>
+                        <li>Vous recevrez un courriel de Quora contenant le lien de téléchargement de vos archives ZIP.</li>
+                        <li>Déposez vos archives ZIP directement ici pour préserver vos articles, questions et images !</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- STEP 2: CONFIGURATION OPTIONS -->
+            <div id="quora-step-options" class="quora-step">
+                <h3 class="step-title"><i class="fa-solid fa-sliders"></i> Configuration de la conversion</h3>
+                <p class="step-intro">Personnalisez les options de génération WXR pour vos archives Quora.</p>
+
+                <form id="quora-options-form">
+                    <!-- Section 1: Profil et Auteur -->
+                    <div class="quora-form-section">
+                        <h4><i class="fa-solid fa-user"></i> 1. Paramètres d'Auteur & Profil</h4>
+                        <div class="quora-form-grid">
+                            <div class="quora-form-group">
+                                <label for="quora-author">Nom de l'auteur :</label>
+                                <input type="text" id="quora-author" name="author" placeholder="ex: Dr Goulu (par défaut extrait du nom)" />
+                                <span class="help-desc">Nom d'affichage de l'auteur dans les articles WordPress.</span>
+                            </div>
+
+                            <div class="quora-form-group">
+                                <label for="quora-author-email">Courriel de l'auteur :</label>
+                                <input type="email" id="quora-author-email" name="author_email" placeholder="ex: auteur@exemple.com" />
+                                <span class="help-desc">Adresse email incluse dans l'en-tête du fichier WXR.</span>
+                            </div>
+
+                            <div class="quora-form-group">
+                                <label for="quora-username">Identifiant Quora (slug) :</label>
+                                <input type="text" id="quora-username" name="quora_username" placeholder="ex: Dr-Goulu" />
+                                <span class="help-desc">Slug du profil Quora pour reconstruire les liens originaux.</span>
+                            </div>
+
+                            <div class="quora-form-group">
+                                <label for="quora-image-base-url">URL de base des images :</label>
+                                <input type="text" id="quora-image-base-url" name="image_base_url" value="/wp-content/uploads/quora" />
+                                <span class="help-desc">Préfixe pour la réécriture des images locales si non hébergées sur le CDN.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Type de contenu & Options d'importation -->
+                    <div class="quora-form-section">
+                        <h4><i class="fa-solid fa-layer-group"></i> 2. Options de Contenu</h4>
+                        <div class="quora-checkbox-group">
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="include_drafts" id="quora-include-drafts" checked />
+                                <div>
+                                    <strong>Inclure les brouillons (Drafts)</strong>
+                                    <span class="help-desc">Convertir les brouillons d'articles Quora en brouillons WordPress.</span>
+                                </div>
+                            </label>
+
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="include_space_posts" id="quora-include-space-posts" checked />
+                                <div>
+                                    <strong>Inclure les publications d'Espaces (Space posts & shares)</strong>
+                                    <span class="help-desc">Inclure les publications et partages effectués dans les Espaces Quora.</span>
+                                </div>
+                            </label>
+
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="use_cdn_images" id="quora-use-cdn-images" checked />
+                                <div>
+                                    <strong>Utiliser le CDN d'images Quora</strong>
+                                    <span class="help-desc">Réécrire les sources d'images `qimg-` vers les URL directes du CDN Quora.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Scraping et vérifications avancées -->
+                    <div class="quora-form-section">
+                        <h4><i class="fa-solid fa-spider"></i> 3. Scraping & Web Options</h4>
+                        <div class="quora-checkbox-group">
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="scrape_topics" id="quora-scrape-topics" checked />
+                                <div>
+                                    <strong>Extraire les Sujets / Tags Quora</strong>
+                                    <span class="help-desc">Récupérer automatiquement les thèmes/mots-clés Quora associés à chaque publication.</span>
+                                </div>
+                            </label>
+
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="scrape_comments" id="quora-scrape-comments" />
+                                <div>
+                                    <strong>Extraire les Commentaires & Réponses</strong>
+                                    <span class="help-desc">Scraper les commentaires et leurs réponses imbriquées (nécessite Chrome/Selenium).</span>
+                                </div>
+                            </label>
+
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="check_online" id="quora-check-online" />
+                                <div>
+                                    <strong>Vérification en ligne des liens</strong>
+                                    <span class="help-desc">Vérifier la validité des URL directes sur Quora (peut être ralenti ou bloqué par Cloudflare).</span>
+                                </div>
+                            </label>
+
+                            <label class="quora-checkbox-label">
+                                <input type="checkbox" name="test_mode" id="quora-test-mode" />
+                                <div>
+                                    <strong>Mode Test rapide</strong>
+                                    <span class="help-desc">Arrêter la conversion dès qu'un article avec images et commentaires est traité.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="quora-form-actions">
+                        <button type="button" class="btn-secondary" id="quora-back-to-upload">
+                            <i class="fa-solid fa-arrow-left"></i> Précédent
+                        </button>
+                        <button type="submit" class="btn-primary" id="quora-start-convert-btn">
+                            <i class="fa-solid fa-bolt"></i> Lancer la conversion WXR
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- STEP 3: CONVERSION PROGRESS & LOG TERMINAL -->
+            <div id="quora-step-progress" class="quora-step">
+                <h3 class="step-title"><i class="fa-solid fa-gear fa-spin"></i> Conversion en cours...</h3>
+                <div class="quora-progress-bar-wrap">
+                    <div class="quora-progress-bar" id="quora-progress-bar"></div>
+                </div>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="terminal-title">quora2wp command output</span>
+                    </div>
+                    <pre class="terminal-body" id="quora-log-console">Waiting for execution...</pre>
+                </div>
+            </div>
+
+            <!-- STEP 4: RESULTS & DOWNLOAD -->
+            <div id="quora-step-results" class="quora-step">
+                <h3 class="step-title"><i class="fa-solid fa-circle-check text-success"></i> Conversion terminée !</h3>
+                <p class="step-intro">Vos fichiers WXR au format WordPress ont été générés avec succès :</p>
+
+                <div class="results-list" id="quora-results-list"></div>
+
+                <div class="quora-form-actions" style="margin-top: 30px;">
+                    <button type="button" class="btn-primary" id="quora-restart-btn">
+                        <i class="fa-solid fa-rotate-right"></i> Convertir d'autres fichiers
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

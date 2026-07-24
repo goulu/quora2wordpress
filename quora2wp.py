@@ -26,7 +26,15 @@ def main():
     )
     
     parser.add_argument(
+        "--web", "-w",
+        action="store_true",
+        help="Launch the Flask web application interface"
+    )
+    
+    parser.add_argument(
         "input_path",
+        nargs="?",
+        default=None,
         help="Path to a single Quora export .zip file, or a directory/folder containing them"
     )
     
@@ -105,6 +113,17 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.web or (len(sys.argv) == 1):
+        # Launch web interface
+        from app import app
+        port = int(os.environ.get('PORT', 5000))
+        print(f"Starting Quora2WordPress web interface on http://localhost:{port}")
+        app.run(host='0.0.0.0', port=port, debug=False)
+        sys.exit(0)
+
+    if not args.input_path:
+        parser.error("the following arguments are required: input_path (unless --web is specified)")
 
     # Fallback logic for output_dir
     input_path = args.input_path

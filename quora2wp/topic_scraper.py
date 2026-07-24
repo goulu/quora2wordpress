@@ -6,7 +6,11 @@ import time
 import datetime
 
 def log_lifecycle(message):
-    log_path = "/home/goulu/Documents/develop/quora2wordpress/chrome_lifecycle.log"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(script_dir) == 'quora2wp':
+        log_path = os.path.join(os.path.dirname(script_dir), "chrome_lifecycle.log")
+    else:
+        log_path = os.path.join(script_dir, "chrome_lifecycle.log")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pid = os.getpid()
     try:

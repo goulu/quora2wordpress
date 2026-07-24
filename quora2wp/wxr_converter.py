@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import datetime
 import urllib.parse
 import unicodedata
@@ -627,7 +628,8 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
         idx, post = idx_post
         title = get_post_title(post, post["type"])
         title = re.sub(r'\[/?math\]', '$', title, flags=re.IGNORECASE)
-        print(f"  [{idx}/{total_posts}] Converting: {title}", flush=True)
+        import sys
+        print(f"  [{idx}/{total_posts}] Converting: {title}", flush=True, file=sys.stderr)
         raw_content = post.get("Content", post.get("Post content", ""))
         content = process_html_content(raw_content, folder_name, image_base_url, use_cdn_images)
         
@@ -657,7 +659,7 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
             
         # Map statuses
         status = "publish"
-        if "brouillon" in post["type"].lower():
+        if "brouillon" in post["type"].lower() or "draft" in post["type"].lower():
             status = "draft"
             
         # Unique post ID
@@ -699,11 +701,11 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
                         tag_xml = f'<category domain="post_tag" nicename="{slugify(topic)}"><![CDATA[{escape_cdata(topic)}]]></category>'
                         if tag_xml not in cats_and_tags:
                             cats_and_tags.append(tag_xml)
-                    print(f"  [{idx}/{total_posts}]   - Topics: Success (found {len(topics_result['topics'])} topics)", flush=True)
+                    print(f"  [{idx}/{total_posts}]   - Topics: Success (found {len(topics_result['topics'])} topics)", flush=True, file=sys.stderr)
                 else:
                     pass
             except Exception as e:
-                print(f"  [{idx}/{total_posts}]   - Topics error: {e}", flush=True)
+                print(f"  [{idx}/{total_posts}]   - Topics error: {e}", flush=True, file=sys.stderr)
                 
         # Automatic Scraping of Comments
         comments_xml_str = ""
@@ -745,11 +747,11 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
 			<wp:comment_user_id>0</wp:comment_user_id>
 		</wp:comment>""")
                     comments_xml_str = "\n".join(comments_list)
-                    print(f"  [{idx}/{total_posts}]   - Comments: Success (found {len(comments_result['comments'])} comments)", flush=True)
+                    print(f"  [{idx}/{total_posts}]   - Comments: Success (found {len(comments_result['comments'])} comments)", flush=True, file=sys.stderr)
                 else:
                     pass
             except Exception as e:
-                print(f"  [{idx}/{total_posts}]   - Comments error: {e}", flush=True)
+                print(f"  [{idx}/{total_posts}]   - Comments error: {e}", flush=True, file=sys.stderr)
 
         cats_xml = "\n\t\t".join(cats_and_tags)
         
@@ -797,7 +799,7 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
                 
                 # build a temporary XML string with the current channel closed
                 current_xml = xml + ["</channel>\n</rss>"]
-                with open(output_file, "w", encoding="utf-8") as f:
+                with open(output_file, "w", encoding="utf-8", errors="replace") as f:
                     f.write('\n'.join(current_xml))
             except Exception as fe:
                 sys.stderr.write(f"Error writing progressive XML to '{output_file}': {fe}\n")
@@ -965,7 +967,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
                     path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file
                 )
                 if post_count > 0:
-                    with open(output_file, "w", encoding="utf-8") as f:
+                    with open(output_file, "w", encoding="utf-8", errors="replace") as f:
                         f.write(wxr_content)
                     print(f"--> Success! Saved {post_count} posts to '{output_file}'")
                     total_files += 1
@@ -982,7 +984,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
                     path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file
                 )
                 if post_count > 0:
-                    with open(output_file, "w", encoding="utf-8") as f:
+                    with open(output_file, "w", encoding="utf-8", errors="replace") as f:
                         f.write(wxr_content)
                     print(f"--> Success! Saved {post_count} posts to '{output_file}'")
                     total_files += 1

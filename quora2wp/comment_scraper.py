@@ -8,7 +8,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 def log_lifecycle(message):
-    log_path = "/home/goulu/Documents/develop/quora2wordpress/chrome_lifecycle.log"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(script_dir) == 'quora2wp':
+        log_path = os.path.join(os.path.dirname(script_dir), "chrome_lifecycle.log")
+    else:
+        log_path = os.path.join(script_dir, "chrome_lifecycle.log")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     pid = os.getpid()
     try:
@@ -106,6 +110,170 @@ def clean_comment_html(soup, text_div):
         parts.append(str(child))
     return "".join(parts).strip()
 
+def fetch_html_fast(url):
+    """
+    Tries to fetch the Quora URL HTML using fast fallbacks (cloudscraper, requests, urllib, curl).
+    Returns the html string if successful, else None.
+    """
+    # Method 1: cloudscraper
+    try:
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
+        response = scraper.get(url, timeout=10)
+        if response.status_code == 200:
+            return response.text
+    except Exception:
+        pass
+
+    # Method 2: requests
+    try:
+        import requests
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return response.text
+    except Exception:
+        pass
+
+    # Method 3: urllib
+    try:
+        import urllib.request
+        import urllib.error
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.read().decode('utf-8', errors='ignore')
+    except Exception:
+        pass
+
+    # Method 4: curl
+    try:
+        import subprocess
+        res = subprocess.run([
+            'curl', '-s', '-L',
+            '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '-H', 'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            url
+        ], capture_output=True, timeout=10)
+        if res.returncode == 0:
+            html = res.stdout.decode('utf-8', errors='ignore')
+            if not ("page not found" in html.lower() or "page introuvable" in html.lower() or "n'avons pas trouvé la page" in html.lower() or "un instant" in html.lower() or "just a moment" in html.lower()):
+                return html
+    except Exception:
+        pass
+
+    return None
+
+def parse_comments_from_html(html, successful_url):
+    """Parses comments from Quora static HTML string."""
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        
+        comments_header = soup.find(string=re.compile(r'^(Commentaires|Comments)$'))
+        if not comments_header:
+            return {"success": True, "comments": [], "warning": "Comments section not found on page.", "resolved_url": successful_url}
+            
+        comments_section = None
+        curr = comments_header.parent
+        while curr:
+            links = curr.find_all('a', href=re.compile(r'/profile/'))
+            if len(links) > 1:
+                comments_section = curr
+                break
+            curr = curr.parent
+            
+        if not comments_section:
+            return {"success": True, "comments": [], "warning": "Comments section container not found.", "resolved_url": successful_url}
+            
+        author_links = comments_section.find_all('a', href=re.compile(r'/profile/'))
+        
+        extracted = []
+        seen_comments = set()
+        
+        for link in author_links:
+            author_name = link.get_text(strip=True)
+            profile_url = link.get('href')
+            if not author_name:
+                continue
+                
+            wrapper = None
+            curr = link.parent
+            for _ in range(15):
+                if not curr:
+                    break
+                text_div = curr.find(lambda el: el.name == 'div' and el.get('class') == ['q-text'])
+                if text_div and link in curr.descendants and text_div != link:
+                    wrapper = curr
+                    break
+                curr = curr.parent
+                
+            if not wrapper:
+                continue
+                
+            wrapper_id = id(wrapper)
+            if wrapper_id in seen_comments:
+                continue
+            seen_comments.add(wrapper_id)
+            
+            comment_id = None
+            date_text = ""
+            for a in wrapper.find_all('a'):
+                href = a.get('href', '')
+                if 'comment_id=' in href:
+                    m = re.search(r'comment_id=(\d+)', href)
+                    if m:
+                        comment_id = m.group(1)
+                    date_text = a.get_text(strip=True)
+                    
+            if not comment_id:
+                comment_id = f"fallback_{len(seen_comments)}"
+                
+            text_div = wrapper.find(lambda el: el.name == 'div' and el.get('class') == ['q-text'])
+            comment_text = clean_comment_html(soup, text_div) if text_div else ""
+                
+            distance = 0
+            p = wrapper
+            while p and p != comments_section:
+                distance += 1
+                p = p.parent
+                
+            extracted.append({
+                "id": comment_id,
+                "author": author_name,
+                "profile_url": profile_url,
+                "text": comment_text,
+                "date": date_text,
+                "distance": distance
+            })
+            
+        if extracted:
+            min_distance = min(c["distance"] for c in extracted)
+            for c in extracted:
+                c["nesting"] = (c["distance"] - min_distance) // 3
+                del c["distance"]
+                
+        last_seen_at_level = {}
+        for c in extracted:
+            lvl = c["nesting"]
+            last_seen_at_level[lvl] = c["id"]
+            if lvl > 0:
+                c["parent_id"] = last_seen_at_level.get(lvl - 1)
+            else:
+                c["parent_id"] = None
+                
+        return {"success": True, "comments": extracted, "resolved_url": successful_url}
+        
+    except Exception as e:
+        return {"success": False, "error": f"Parsing error: {str(e)}", "comments": [], "resolved_url": successful_url}
+
 def scrape_comments_from_urls(urls, gui=False):
     """
     Scrapes comments for the given list of Quora URLs.
@@ -135,8 +303,23 @@ def scrape_comments_from_urls(urls, gui=False):
         sys.stderr.write("DEBUG: cloudscraper not installed, skipping precheck\n")
         valid_urls = list(urls)
         
-    if not valid_urls:
-        return {"success": False, "error": "None of the Quora URLs could be loaded (Page not found or redirected).", "comments": []}
+    # 1. Try to scrape comments from static HTML via fast fallbacks first
+    for url in valid_urls:
+        try:
+            log_lifecycle(f"comment_scraper: Attempting fast static HTML scraping for URL: {url}")
+            html = fetch_html_fast(url)
+            if html:
+                res = parse_comments_from_html(html, url)
+                if res["success"] and res["comments"]:
+                    log_lifecycle(f"comment_scraper: Successfully scraped {len(res['comments'])} comments from static HTML via fast fallbacks for {url}")
+                    return res
+                else:
+                    log_lifecycle(f"comment_scraper: Fast scraping returned 0 comments for {url}, will fall back to Selenium Chrome")
+            else:
+                log_lifecycle(f"comment_scraper: Fast scraping failed to fetch HTML for {url}, will fall back to Selenium Chrome")
+        except Exception as e:
+            sys.stderr.write(f"DEBUG: Fast comments scraping failed: {e}\n")
+            log_lifecycle(f"comment_scraper: EXCEPTION in fast scraping: {e}")
 
     # Set up a persistent profile to remember login sessions/cookies
     user_home = os.path.expanduser("~")
