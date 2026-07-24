@@ -55,4 +55,4 @@ Available options:
 * `--scrape-comments`: Automatically retrieve comments and nested replies for each converted post (`True` or `False`, default: `False`)
 * `--link-position`: Position to insert backlink to Quora in post content (`none`, `top`, or `bottom`, default: `none`)
 * `--link-template`: HTML link template with `$link$` placeholder (default: `<a href="$link$" target="_blank">voir sur Quora</a>`)
-* `--test`: Mode test. Convertit uniquement un maximum de 10 articles contenant des images pour valider rapidement la conversion et la génération des médias WXR.
+* `--test`: Mode test. Convertit uniquement les articles contenant une image, du LaTeX ou un lien Wikipédia, et s'arrête dès que les 3 situations ont été rencontrées.

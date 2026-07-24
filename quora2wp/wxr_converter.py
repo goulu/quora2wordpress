@@ -937,7 +937,8 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
     old_sigint = signal.signal(signal.SIGINT, handle_cancel_signal)
     old_sigterm = signal.signal(signal.SIGTERM, handle_cancel_signal)
 
-    test_image_count = 0
+    test_situations = {"image": False, "latex": False, "wiki": False}
+    test_converted_count = 0
 
     try:
         for idx, post in enumerate(posts, start=1):
@@ -945,10 +946,14 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
                 print(f"\n--> Interruption confirmée ! {idx-1} articles sur {total_posts} ont été sauvegardés.", flush=True)
                 break
 
-            raw_content = post.get("Content", post.get("Post content", ""))
-            has_image = "<img" in (raw_content or "").lower()
+            raw_content = post.get("Content", post.get("Post content", "")) or ""
+            raw_title = post.get("Question", post.get("Title", post.get("Post title", ""))) or ""
 
-            if test_mode and not has_image:
+            has_image = bool(re.search(r'<img|qimg-', raw_content, flags=re.IGNORECASE))
+            has_latex = bool(re.search(r'\[/?math\]', raw_content + ' ' + raw_title, flags=re.IGNORECASE))
+            has_wiki = bool(re.search(r'wikipedia\.org', raw_content, flags=re.IGNORECASE))
+
+            if test_mode and not (has_image or has_latex or has_wiki):
                 continue
 
             idx, item_xml, content, comments_xml_str, attachment_items_xml = process_single_post((idx, post))
@@ -971,7 +976,19 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
                     sys.stderr.write(f"Error writing progressive XML to '{output_file}': {fe}\n")
             
             if test_mode:
-                test_image_count += 1
+                test_converted_count += 1
+                test_situations["image"] = test_situations["image"] or has_image
+                test_situations["latex"] = test_situations["latex"] or has_latex
+                test_situations["wiki"] = test_situations["wiki"] or has_wiki
+
+                matched_types = []
+                if has_image: matched_types.append("Image")
+                if has_latex: matched_types.append("LaTeX")
+                if has_wiki: matched_types.append("Wikipédia")
+
+                status_str = f"Image={'OK' if test_situations['image'] else 'Non'}, LaTeX={'OK' if test_situations['latex'] else 'Non'}, Wikipédia={'OK' if test_situations['wiki'] else 'Non'}"
+                print(f"  [Mode Test #{test_converted_count}] Inclus ({', '.join(matched_types)}) | Statut des 3 situations: {status_str}", flush=True)
+
                 # Check for active chrome processes after converting each article
                 time.sleep(0.5)  # small grace period for clean driver shutdown
                 active_chrome = get_active_chrome_processes()
@@ -985,11 +1002,9 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
                             os.kill(pid, signal.SIGKILL)
                         except Exception:
                             pass
-                else:
-                    print(f"  [Test Mode] Verification ({test_image_count}/10 images): No active Chrome processes detected after converting post {idx}.", flush=True)
 
-                if test_image_count >= 10:
-                    print(f"  --> Test mode: Reached maximum limit of 10 posts containing images. Stopping early.")
+                if test_situations["image"] and test_situations["latex"] and test_situations["wiki"]:
+                    print(f"  --> Mode test: Les 3 situations (Image, LaTeX, Wikipédia) ont été rencontrées après {test_converted_count} article(s). Arrêt anticipé.", flush=True)
                     break
     finally:
         try:

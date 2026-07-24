@@ -116,7 +116,7 @@ def main():
         "--test",
         action="store_true",
         default=saved_cfg.get("test_mode", False),
-        help="Mode test: convertit uniquement au maximum 10 articles contenant des images"
+        help="Mode test: convertit uniquement les articles contenant une image, du LaTeX ou un lien Wikipédia, et s'arrête dès que les 3 situations ont été rencontrées"
     )
 
     args = parser.parse_args()

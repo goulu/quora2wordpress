@@ -8,5 +8,5 @@
   "r2w_support": true,
   "scrape_topics": true,
   "scrape_comments": false,
-  "test_mode": false
+  "test_mode": true
 }
