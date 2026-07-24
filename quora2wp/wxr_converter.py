@@ -599,8 +599,133 @@ def get_active_chrome_processes():
                 continue
     return active
 
+def generate_comments_wxr(posts, folder_name, quora_username=None, output_file=None, r2w_support=False):
+    """Generate WXR XML specifically for restoring comments under target WordPress posts by slug/title."""
+    site_title = f"Quora Comments Export - {folder_name}"
+    site_link = "https://quora.com"
+    site_desc = "Quora Comments WXR Import for WordPress"
+    pub_date = datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+    extracted_author = extract_author_from_folder(folder_name)
+    author_display = quora_username if quora_username else (extracted_author if extracted_author else "Admin")
+    author_login = slugify(author_display) or "dr-goulu"
+    author_email_str = f"{author_login}@localhost"
+
+    comments_by_slug = {}
+    for item in posts:
+        answer_url = item.get("Answer", "")
+        if answer_url:
+            path = urllib.parse.urlparse(answer_url).path
+            m = re.search(r'^/([^/]+)/answer/', path)
+            if m:
+                q_slug = m.group(1)
+                comments_by_slug.setdefault((q_slug, answer_url), []).append(item)
+
+    xml = []
+    xml.append(f"""<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0"
+	xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:wp="http://wordpress.org/export/1.2/"
+>
+
+<channel>
+	<title>{escape_cdata(site_title)}</title>
+	<link>{site_link}</link>
+	<description>{escape_cdata(site_desc)}</description>
+	<pubDate>{pub_date}</pubDate>
+	<language>fr-FR</language>
+	<wp:wxr_version>1.2</wp:wxr_version>
+
+	<wp:author>
+		<wp:author_id>1</wp:author_id>
+		<wp:author_login>{author_login}</wp:author_login>
+		<wp:author_email>{author_email_str}</wp:author_email>
+		<wp:author_display_name><![CDATA[{escape_cdata(author_display)}]]></wp:author_display_name>
+	</wp:author>
+""")
+
+    comment_counter = 50000
+    for item_idx, ((q_slug, answer_url), comments) in enumerate(comments_by_slug.items(), start=1):
+        raw_title = urllib.parse.unquote(q_slug).replace('-', ' ')
+        wp_post_name = slugify(raw_title)
+        
+        raw_date = comments[0].get('Creation time', '')
+        local_dt, gmt_dt = parse_quora_date(raw_date)
+        if local_dt:
+            post_date = local_dt.strftime('%Y-%m-%d %H:%M:%S')
+            post_date_gmt = gmt_dt.strftime('%Y-%m-%d %H:%M:%S')
+            item_pub_date = gmt_dt.strftime('%a, %d %b %Y %H:%M:%S +0000')
+        else:
+            now = datetime.datetime.now()
+            post_date = now.strftime('%Y-%m-%d %H:%M:%S')
+            post_date_gmt = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            item_pub_date = pub_date
+
+        comments_xml = []
+        for c in comments:
+            comment_counter += 1
+            c_raw_content = c.get('Content', '')
+            c_content = process_html_content(c_raw_content, folder_name, r2w_support=r2w_support)
+            c_date_raw = c.get('Creation time', '')
+            c_local, c_gmt = parse_quora_date(c_date_raw)
+            c_date_str = c_local.strftime('%Y-%m-%d %H:%M:%S') if c_local else post_date
+            c_gmt_str = c_gmt.strftime('%Y-%m-%d %H:%M:%S') if c_gmt else post_date_gmt
+
+            comments_xml.append(f"""		<wp:comment>
+			<wp:comment_id>{comment_counter}</wp:comment_id>
+			<wp:comment_author><![CDATA[{escape_cdata(author_display)}]]></wp:comment_author>
+			<wp:comment_author_email><![CDATA[{author_email_str}]]></wp:comment_author_email>
+			<wp:comment_author_url>{escape_cdata(answer_url)}</wp:comment_author_url>
+			<wp:comment_author_IP><![CDATA[]]></wp:comment_author_IP>
+			<wp:comment_date><![CDATA[{c_date_str}]]></wp:comment_date>
+			<wp:comment_date_gmt><![CDATA[{c_gmt_str}]]></wp:comment_date_gmt>
+			<wp:comment_content><![CDATA[{escape_cdata(c_content)}]]></wp:comment_content>
+			<wp:comment_approved><![CDATA[1]]></wp:comment_approved>
+			<wp:comment_type><![CDATA[comment]]></wp:comment_type>
+			<wp:comment_parent>0</wp:comment_parent>
+		</wp:comment>""")
+
+        comments_block = '\n'.join(comments_xml)
+        item_xml = f"""	<item>
+		<title><![CDATA[{escape_cdata(raw_title)}]]></title>
+		<link>{escape_cdata(answer_url)}</link>
+		<pubDate>{item_pub_date}</pubDate>
+		<dc:creator><![CDATA[{author_login}]]></dc:creator>
+		<guid isPermaLink="false">{answer_url}</guid>
+		<description></description>
+		<content:encoded><![CDATA[]]></content:encoded>
+		<excerpt:encoded><![CDATA[]]></excerpt:encoded>
+		<wp:post_id>{item_idx}</wp:post_id>
+		<wp:post_name><![CDATA[{wp_post_name}]]></wp:post_name>
+		<wp:post_date><![CDATA[{post_date}]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[{post_date_gmt}]]></wp:post_date_gmt>
+		<wp:comment_status><![CDATA[open]]></wp:comment_status>
+		<wp:ping_status><![CDATA[open]]></wp:ping_status>
+		<wp:status><![CDATA[publish]]></wp:status>
+		<wp:post_type><![CDATA[post]]></wp:post_type>
+{comments_block}
+	</item>"""
+        xml.append(item_xml)
+
+    xml.append("</channel>\n</rss>")
+    final_wxr = "\n".join(xml)
+    if output_file:
+        try:
+            with open(output_file, "w", encoding="utf-8", errors="replace") as f:
+                f.write(final_wxr)
+        except Exception as e:
+            sys.stderr.write(f"Error writing comment XML to '{output_file}': {e}\n")
+
+    return final_wxr
+
 def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0, r2w_support=False):
     """Generate a valid WXR XML string from a list of post dictionaries."""
+    if posts and all(any(k in p.get("type", "").lower() for k in ["commentaire", "reply"]) for p in posts):
+        return generate_comments_wxr(posts, folder_name, quora_username, output_file=output_file, r2w_support=r2w_support)
+
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
     site_desc = "WordPress eXtended RSS export from Quora"
@@ -718,6 +843,12 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
 
                         parsed_path = urllib.parse.urlparse(img_url).path
                         img_filename = os.path.basename(parsed_path) or f"quora-image-{att_id}.jpg"
+                        if not os.path.splitext(img_filename)[1]:
+                            img_filename += ".jpg"
+
+                        attachment_url = img_url
+                        if not os.path.splitext(parsed_path)[1]:
+                            attachment_url += "#quora-image.jpg"
 
                         att_item_xml = f"""	<item>
 		<title><![CDATA[{escape_cdata(img_filename)}]]></title>
@@ -727,7 +858,7 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
 		<wp:post_date_gmt><![CDATA[{post_date_gmt}]]></wp:post_date_gmt>
 		<wp:status><![CDATA[inherit]]></wp:status>
 		<wp:post_type><![CDATA[attachment]]></wp:post_type>
-		<wp:attachment_url><![CDATA[{escape_cdata(img_url)}]]></wp:attachment_url>
+		<wp:attachment_url><![CDATA[{escape_cdata(attachment_url)}]]></wp:attachment_url>
 	</item>"""
                         attachment_items_xml.append(att_item_xml)
                     else:
@@ -827,11 +958,12 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
         cats_and_tags = []
         
         # Base categories/tags depending on block type
-        if post["type"] == "Répondre":
-            cats_and_tags.append('<category domain="category" nicename="quora-answers"><![CDATA[Quora Answers]]></category>')
-        elif post["type"] == "Brouillon de réponse":
+        type_lower = post["type"].lower()
+        if "brouillon" in type_lower or "draft" in type_lower:
             cats_and_tags.append('<category domain="category" nicename="quora-drafts"><![CDATA[Quora Drafts]]></category>')
-        elif post["type"] in ["Envoi d'espace", "Élément d'espace"]:
+        elif "répondre" in type_lower or "réponse" in type_lower or "answer" in type_lower:
+            cats_and_tags.append('<category domain="category" nicename="quora-answers"><![CDATA[Quora Answers]]></category>')
+        elif "espace" in type_lower or "space" in type_lower:
             cats_and_tags.append('<category domain="category" nicename="quora-space-posts"><![CDATA[Quora Space Posts]]></category>')
         else:
             cats_and_tags.append('<category domain="category" nicename="quora-export"><![CDATA[Quora Export]]></category>')
@@ -1027,14 +1159,20 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
 
 def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
     """Common extraction logic to parse post structures from index.html BeautifulSoup."""
-    target_types = ["Répondre", "Brouillon de réponse", "Envoi d'espace", "Élément d'espace", "Brouillon de publication"]
+    target_types = [
+        "Répondre", "Réponses", "Answer", "Answers",
+        "Brouillon de réponse", "Answer Draft",
+        "Envoi d'espace", "Élément d'espace", "Space post", "Space share",
+        "Brouillon de publication", "Post Draft",
+        "Répondre à un commentaire", "Reply to a comment", "Commentaire", "Comment"
+    ]
     
     posts = []
     h2s = soup.find_all("h2")
     
     for h2 in h2s:
         h2_type = h2.text.strip()
-        if h2_type not in target_types:
+        if not any(t.lower() in h2_type.lower() for t in target_types):
             continue
             
         # Parse post fields from siblings
