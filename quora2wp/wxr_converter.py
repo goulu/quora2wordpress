@@ -288,6 +288,7 @@ def get_post_title(post_data, h2_type):
         if key in post_data and post_data[key]:
             title = post_data[key].strip()
             title = re.sub(r'\s+', ' ', title)
+            title = re.sub(r'\[/?math\]', '$', title, flags=re.IGNORECASE)
             return title
             
     # Fallback for Space elements/shares that do not have a title key
@@ -301,11 +302,13 @@ def get_post_title(post_data, h2_type):
         if first_a and first_a.text.strip():
             # Check if the link starts early in the HTML body
             if html_content.index(str(first_a)) < 50:
-                return first_a.text.strip()
+                t = first_a.text.strip()
+                return re.sub(r'\[/?math\]', '$', t, flags=re.IGNORECASE)
                 
         # Otherwise, use the first 80 characters of text
         text = s.get_text().strip()
         text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'\[/?math\]', '$', text, flags=re.IGNORECASE)
         if len(text) > 80:
             return text[:80] + '...'
         return text if text else f"Untitled {h2_type}"
