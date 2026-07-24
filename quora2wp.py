@@ -101,6 +101,12 @@ def main():
         help='HTML template for Quora link, using $link$ as URL variable (default: \'<a href="$link$" target="_blank">voir sur Quora</a>\')'
     )
     parser.add_argument(
+        "--min-content-length",
+        type=int,
+        default=saved_cfg.get("min_content_length", 0),
+        help="Minimum content character length below which a published post is converted to a draft (default: 0)"
+    )
+    parser.add_argument(
         "--test",
         action="store_true",
         default=saved_cfg.get("test_mode", False),
@@ -144,7 +150,8 @@ def main():
             test_mode=args.test,
             max_processes=args.max_processes,
             link_position=args.link_position,
-            link_template=args.link_template
+            link_template=args.link_template,
+            min_content_length=args.min_content_length
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

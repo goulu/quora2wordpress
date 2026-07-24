@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     "link_template": '<a href="$link$" target="_blank">voir sur Quora</a>',
     "include_drafts": True,
     "include_space_posts": True,
+    "min_content_length": 0,
     "scrape_topics": True,
     "scrape_comments": False,
     "test_mode": False
@@ -145,6 +146,9 @@ def convert():
                 if data.get('link_template'):
                     cmd.extend(['--link-template', data['link_template']])
                     
+            if data.get('min_content_length') and int(data.get('min_content_length', 0)) > 0:
+                cmd.extend(['--min-content-length', str(data['min_content_length'])])
+
             if data.get('test_mode'):
                 cmd.append('--test')
 

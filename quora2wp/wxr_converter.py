@@ -586,7 +586,7 @@ def get_active_chrome_processes():
                 continue
     return active
 
-def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
     """Generate a valid WXR XML string from a list of post dictionaries."""
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
@@ -805,6 +805,10 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
         status = "publish"
         if "brouillon" in post["type"].lower() or "draft" in post["type"].lower():
             status = "draft"
+        elif min_content_length > 0:
+            plain_text = BeautifulSoup(content, 'html.parser').get_text().strip()
+            if len(plain_text) < min_content_length:
+                status = "draft"
             
         # Categories & tags
         cats_and_tags = []
@@ -1035,7 +1039,7 @@ def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
         
     return posts
 
-def process_folder(folder_path, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_folder(folder_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
     """Parse index.html in the folder and return the WXR XML content if posts found."""
     folder_name = os.path.basename(folder_path)
     index_path = os.path.join(folder_path, "index.html")
@@ -1050,10 +1054,10 @@ def process_folder(folder_path, include_drafts, include_space_posts, quora_usern
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length)
     return wxr_content, len(posts)
 
-def process_zip(zip_path, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_zip(zip_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
     """Parse index.html in the zip file and return the WXR XML content if posts found."""
     folder_name = os.path.splitext(os.path.basename(zip_path))[0]
     
@@ -1077,10 +1081,10 @@ def process_zip(zip_path, include_drafts, include_space_posts, quora_username=No
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length)
     return wxr_content, len(posts)
 
-def run_conversion(input_path, output_dir, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def run_conversion(input_path, output_dir, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
     """Processes input_path (which can be a single zip, single folder, or dir of folders/zips) and saves WXR to output_dir."""
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Error: Input path '{input_path}' does not exist.")
@@ -1123,7 +1127,7 @@ def run_conversion(input_path, output_dir, include_drafts, include_space_posts, 
                 folder_name = os.path.splitext(name)[0]
                 output_file = os.path.join(output_dir, f"{folder_name}.xml")
                 wxr_content, post_count = process_zip(
-                    path, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
@@ -1140,7 +1144,7 @@ def run_conversion(input_path, output_dir, include_drafts, include_space_posts, 
             try:
                 output_file = os.path.join(output_dir, f"{name}.xml")
                 wxr_content, post_count = process_folder(
-                    path, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
