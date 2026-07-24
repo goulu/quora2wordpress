@@ -82,12 +82,6 @@
                             </div>
 
                             <div class="quora-form-group">
-                                <label for="quora-image-base-url">URL de base des images :</label>
-                                <input type="text" id="quora-image-base-url" name="image_base_url" value="/wp-content/uploads/quora" />
-                                <span class="help-desc">Préfixe pour la réécriture des images locales si non hébergées sur le CDN.</span>
-                            </div>
-
-                            <div class="quora-form-group">
                                 <label for="quora-link-position">Lien vers Quora dans l'article :</label>
                                 <select name="link_position" id="quora-link-position" class="quora-select">
                                     <option value="none" selected>Non</option>
@@ -122,14 +116,6 @@
                                 <div>
                                     <strong>Inclure les publications d'Espaces (Space posts & shares)</strong>
                                     <span class="help-desc">Inclure les publications et partages effectués dans les Espaces Quora.</span>
-                                </div>
-                            </label>
-
-                            <label class="quora-checkbox-label">
-                                <input type="checkbox" name="use_cdn_images" id="quora-use-cdn-images" checked />
-                                <div>
-                                    <strong>Utiliser le CDN d'images Quora</strong>
-                                    <span class="help-desc">Réécrire les sources d'images `qimg-` vers les URL directes du CDN Quora.</span>
                                 </div>
                             </label>
                         </div>
@@ -167,7 +153,7 @@
                                 <input type="checkbox" name="test_mode" id="quora-test-mode" />
                                 <div>
                                     <strong>Mode Test rapide</strong>
-                                    <span class="help-desc">Arrêter la conversion dès qu'un article avec images et commentaires est traité.</span>
+                                    <span class="help-desc">Convertir uniquement un maximum de 10 articles contenant des images.</span>
                                 </div>
                             </label>
                         </div>

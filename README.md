@@ -46,16 +46,14 @@ Positional arguments:
 * `output_dir` (Optional): Destination folder for generated WXR XML files. If not specified, WXR files will be saved in the same location as `input_path`.
 
 Available options:
-* `--image-base-url`: URL prefix to rewrite local images if not on CDN (default: `/wp-content/uploads/quora`)
 * `--author`: Default author display name for the posts (default: extracted from folder name)
 * `--author-email`: Default author email for the WXR header
 * `--include-drafts`: Include draft posts (`True` or `False`, default: `True`)
 * `--include-space-posts`: Include space posts and shares (`True` or `False`, default: `True`)
-* `--use-cdn-images`: Rewrite image sources containing qimg- to Quora CDN URLs (`True` or `False`, default: `True`)
 * `--quora-username`: Quora profile username slug (e.g. `Dr-Goulu`) to reconstruct valid answer URLs (default: derived from folder name)
 * `--check-online`: Enable online verification of candidate URLs to ensure links are active (can be slow or blocked by Cloudflare)
 * `--scrape-topics`: Automatically retrieve Quora tags/topics for each converted post (`True` or `False`, default: `True`)
 * `--scrape-comments`: Automatically retrieve comments and nested replies for each converted post (`True` or `False`, default: `False`)
 * `--link-position`: Position to insert backlink to Quora in post content (`none`, `top`, or `bottom`, default: `none`)
 * `--link-template`: HTML link template with `$link$` placeholder (default: `<a href="$link$" target="_blank">voir sur Quora</a>`)
-* `--test`: Test mode. Stops conversion as soon as a post containing both images and comments is processed (or after a maximum of 30 posts) to quickly validate scraping functionality without converting the entire export.
+* `--test`: Mode test. Convertit uniquement un maximum de 10 articles contenant des images pour valider rapidement la conversion et la génération des médias WXR.

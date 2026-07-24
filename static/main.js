@@ -214,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cfg.author !== undefined) document.getElementById('quora-author').value = cfg.author;
             if (cfg.author_email !== undefined) document.getElementById('quora-author-email').value = cfg.author_email;
             if (cfg.quora_username !== undefined) document.getElementById('quora-username').value = cfg.quora_username;
-            if (cfg.image_base_url !== undefined) document.getElementById('quora-image-base-url').value = cfg.image_base_url;
 
             if (cfg.link_position !== undefined && linkPositionSelect && linkTemplateGroup) {
                 linkPositionSelect.value = cfg.link_position;
@@ -224,7 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (cfg.include_drafts !== undefined) document.getElementById('quora-include-drafts').checked = cfg.include_drafts;
             if (cfg.include_space_posts !== undefined) document.getElementById('quora-include-space-posts').checked = cfg.include_space_posts;
-            if (cfg.use_cdn_images !== undefined) document.getElementById('quora-use-cdn-images').checked = cfg.use_cdn_images;
             if (cfg.scrape_topics !== undefined) document.getElementById('quora-scrape-topics').checked = cfg.scrape_topics;
             if (cfg.scrape_comments !== undefined) document.getElementById('quora-scrape-comments').checked = cfg.scrape_comments;
             if (cfg.check_online !== undefined) document.getElementById('quora-check-online').checked = cfg.check_online;

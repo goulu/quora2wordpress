@@ -29,12 +29,10 @@ DEFAULT_CONFIG = {
     "author": "",
     "author_email": "",
     "quora_username": "",
-    "image_base_url": "/wp-content/uploads/quora",
     "link_position": "none",
     "link_template": '<a href="$link$" target="_blank">voir sur Quora</a>',
     "include_drafts": True,
     "include_space_posts": True,
-    "use_cdn_images": True,
     "scrape_topics": True,
     "scrape_comments": False,
     "check_online": False,
@@ -137,8 +135,6 @@ def convert():
             ]
 
             # Append option arguments
-            if data.get('image_base_url'):
-                cmd.extend(['--image-base-url', data['image_base_url']])
             if data.get('author'):
                 cmd.extend(['--author', data['author']])
             if data.get('author_email'):
@@ -148,7 +144,6 @@ def convert():
             
             cmd.extend(['--include-drafts', 'true' if data.get('include_drafts', True) else 'false'])
             cmd.extend(['--include-space-posts', 'true' if data.get('include_space_posts', True) else 'false'])
-            cmd.extend(['--use-cdn-images', 'true' if data.get('use_cdn_images', True) else 'false'])
             cmd.extend(['--scrape-topics', 'true' if data.get('scrape_topics', True) else 'false'])
             cmd.extend(['--scrape-comments', 'true' if data.get('scrape_comments', False) else 'false'])
             

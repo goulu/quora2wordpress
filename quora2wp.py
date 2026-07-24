@@ -55,11 +55,6 @@ def main():
     )
     
     parser.add_argument(
-        "--image-base-url", 
-        default=saved_cfg.get("image_base_url", "/wp-content/uploads/quora"), 
-        help="Base URL prefix for rewriting images (default: /wp-content/uploads/quora)"
-    )
-    parser.add_argument(
         "--author", 
         default=saved_cfg.get("author", ""), 
         help="Default author display name for the posts (default: extracted from folder name)"
@@ -80,12 +75,6 @@ def main():
         type=str2bool, 
         default=saved_cfg.get("include_space_posts", True), 
         help="Include space posts and shares (default: True)"
-    )
-    parser.add_argument(
-        "--use-cdn-images",
-        type=str2bool,
-        default=saved_cfg.get("use_cdn_images", True),
-        help="Rewrite image sources containing qimg- to Quora CDN URLs (default: True)"
     )
     parser.add_argument(
         "--quora-username",
@@ -131,7 +120,7 @@ def main():
         "--test",
         action="store_true",
         default=saved_cfg.get("test_mode", False),
-        help="Stop conversion early as soon as posts containing both images and comments are found"
+        help="Mode test: convertit uniquement au maximum 10 articles contenant des images"
     )
 
     args = parser.parse_args()
@@ -163,12 +152,10 @@ def main():
         run_conversion(
             input_path=input_path,
             output_dir=output_dir,
-            image_base_url=args.image_base_url,
             author=args.author,
             author_email=args.author_email,
             include_drafts=args.include_drafts,
             include_space_posts=args.include_space_posts,
-            use_cdn_images=args.use_cdn_images,
             quora_username=args.quora_username,
             check_online=args.check_online,
             scrape_topics=args.scrape_topics,

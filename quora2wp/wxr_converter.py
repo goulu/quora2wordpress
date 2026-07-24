@@ -189,8 +189,8 @@ def parse_comment_date_helper(date_str, post_date_str):
     computed = post_dt + datetime.timedelta(days=1)
     return computed.strftime("%Y-%m-%d %H:%M:%S"), computed.strftime("%Y-%m-%d %H:%M:%S")
 
-def process_html_content(content_html, folder_name, image_base_url, use_cdn_images=True):
-    """Clean links and rewrite relative image URLs inside the HTML body."""
+def process_html_content(content_html, folder_name):
+    """Clean links and rewrite image URLs to Quora CDN inside the HTML body."""
     if not content_html:
         return ""
     
@@ -219,31 +219,47 @@ def process_html_content(content_html, folder_name, image_base_url, use_cdn_imag
         if href:
             a['href'] = clean_quora_url(href)
             
-    # 2. Rewrite image sources / attributes
-    if use_cdn_images:
-        for element in soup.find_all(True):
-            for attr, val in list(element.attrs.items()):
-                if isinstance(val, str) and 'qimg-' in val:
-                    m = re.search(r'qimg-([a-f0-9]+)', val)
-                    if m:
-                        element[attr] = f"https://qph.cf2.quoracdn.net/main-qimg-{m.group(1)}"
-    else:
-        # Fallback rewriting to local assets
-        for img in soup.find_all('img'):
-            src = img.get('src')
-            master_src = img.get('master_src')
-            if src:
-                base = image_base_url.rstrip('/')
-                if src.startswith('images/'):
-                    img['src'] = f"{base}/{folder_name}/{src}"
-                elif 'qimg-' in src:
-                    img['src'] = f"{base}/{folder_name}/images/{src}"
-            if master_src:
-                base = image_base_url.rstrip('/')
-                if master_src.startswith('images/'):
-                    img['master_src'] = f"{base}/{folder_name}/{master_src}"
-                elif 'qimg-' in master_src:
-                    img['master_src'] = f"{base}/{folder_name}/images/{master_src}"
+    # 2. Rewrite image sources / attributes to Quora CDN
+    for element in soup.find_all(True):
+        for attr, val in list(element.attrs.items()):
+            if isinstance(val, str) and 'qimg-' in val:
+                m = re.search(r'qimg-([a-f0-9]+)', val)
+                if m:
+                    element[attr] = f"https://qph.cf2.quoracdn.net/main-qimg-{m.group(1)}"
+
+    # 3. Strip Quora-specific image wrappers and classes that break WordPress rendering
+    for wrapper in soup.find_all(class_=re.compile(r'ui_qtext_image_outer|qtext_image_wrapper|qlink_container')):
+        wrapper.unwrap()
+
+    for p in soup.find_all('p'):
+        if 'class' in p.attrs:
+            p_classes = p.get('class', [])
+            if isinstance(p_classes, list):
+                filtered_p_classes = [c for c in p_classes if c not in ['qtext_para', 'u-ltr', 'u-text-align--start']]
+                if filtered_p_classes:
+                    p['class'] = filtered_p_classes
+                else:
+                    del p['class']
+            else:
+                del p['class']
+
+    for img in soup.find_all('img'):
+        for attr in ['master_src', 'master_w', 'master_h', 'onclick', 'data-qt-tooltip']:
+            if attr in img.attrs:
+                del img[attr]
+        classes = img.get('class', [])
+        if isinstance(classes, list):
+            filtered_classes = [c for c in classes if c not in ['landscape', 'portrait', 'qtext_image', 'zoomable_in_feed']]
+            if filtered_classes:
+                img['class'] = filtered_classes
+            else:
+                del img['class']
+        elif isinstance(classes, str):
+            filtered_classes = [c for c in classes.split() if c not in ['landscape', 'portrait', 'qtext_image', 'zoomable_in_feed']]
+            if filtered_classes:
+                img['class'] = " ".join(filtered_classes)
+            else:
+                del img['class']
                 
     return str(soup)
 
@@ -567,7 +583,7 @@ def get_active_chrome_processes():
                 continue
     return active
 
-def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def generate_wxr(posts, folder_name, author, author_email, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Generate a valid WXR XML string from a list of post dictionaries."""
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
@@ -623,6 +639,8 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
 """)
 
     total_posts = len(posts)
+    attachment_counter = [10000]
+    url_to_attachment_id = {}
 
     def process_single_post(idx_post):
         idx, post = idx_post
@@ -631,7 +649,7 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
         import sys
         print(f"  [{idx}/{total_posts}] Converting: {title}", flush=True, file=sys.stderr)
         raw_content = post.get("Content", post.get("Post content", ""))
-        content = process_html_content(raw_content, folder_name, image_base_url, use_cdn_images)
+        content = process_html_content(raw_content, folder_name)
         
         # Dates
         raw_date = post.get("Creation time", post.get("Last updated", post.get("Time", "")))
@@ -648,6 +666,85 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
             item_pub_date = pub_date
             
         post_name = slugify(title)
+        post_id = idx
+
+        # Process images inside content to create WordPress WXR attachment items
+        attachment_items_xml = []
+        first_attachment_id = None
+
+        if content and '<img' in content.lower():
+            try:
+                soup_img = BeautifulSoup(content, 'html.parser')
+                img_tags = soup_img.find_all('img')
+                for img in img_tags:
+                    src = img.get('src') or img.get('master_src') or img.get('data-src')
+                    if not src:
+                        continue
+
+                    # Resolve absolute image URL for WordPress attachment downloader (always using Quora CDN)
+                    if src.startswith(('http://', 'https://')):
+                        img_url = src
+                    elif src.startswith('//'):
+                        img_url = f"https:{src}"
+                    elif 'qimg-' in src:
+                        m_qimg = re.search(r'qimg-([a-f0-9]+)', src)
+                        if m_qimg:
+                            img_url = f"https://qph.cf2.quoracdn.net/main-qimg-{m_qimg.group(1)}"
+                        else:
+                            img_url = src
+                    else:
+                        img_url = src
+
+                    if img_url not in url_to_attachment_id:
+                        attachment_counter[0] += 1
+                        att_id = attachment_counter[0]
+                        url_to_attachment_id[img_url] = att_id
+
+                        parsed_path = urllib.parse.urlparse(img_url).path
+                        img_filename = os.path.basename(parsed_path) or f"quora-image-{att_id}.jpg"
+
+                        att_item_xml = f"""	<item>
+		<title><![CDATA[{escape_cdata(img_filename)}]]></title>
+		<dc:creator><![CDATA[{author_login}]]></dc:creator>
+		<wp:post_id>{att_id}</wp:post_id>
+		<wp:post_date><![CDATA[{post_date}]]></wp:post_date>
+		<wp:post_date_gmt><![CDATA[{post_date_gmt}]]></wp:post_date_gmt>
+		<wp:status><![CDATA[inherit]]></wp:status>
+		<wp:post_type><![CDATA[attachment]]></wp:post_type>
+		<wp:attachment_url><![CDATA[{escape_cdata(img_url)}]]></wp:attachment_url>
+	</item>"""
+                        attachment_items_xml.append(att_item_xml)
+                    else:
+                        att_id = url_to_attachment_id[img_url]
+
+                    if first_attachment_id is None:
+                        first_attachment_id = att_id
+
+                    # Add WordPress standard CSS classes and src
+                    existing_class = img.get('class', [])
+                    if isinstance(existing_class, list):
+                        class_str = " ".join(existing_class)
+                    else:
+                        class_str = str(existing_class or "")
+
+                    wp_class = f"aligncenter size-full wp-image-{att_id}"
+                    if f"wp-image-{att_id}" not in class_str:
+                        class_str = f"{class_str} {wp_class}".strip()
+
+                    img['class'] = class_str
+                    img['src'] = img_url
+
+                content = str(soup_img)
+            except Exception as ie:
+                sys.stderr.write(f"Error processing image attachments for post {post_id}: {ie}\n")
+
+        # Featured image postmeta (_thumbnail_id)
+        thumbnail_meta_xml = ""
+        if first_attachment_id:
+            thumbnail_meta_xml = f"""		<wp:postmeta>
+			<wp:meta_key><![CDATA[_thumbnail_id]]></wp:meta_key>
+			<wp:meta_value><![CDATA[{first_attachment_id}]]></wp:meta_value>
+		</wp:postmeta>"""
         
         # Reconstruct the correct Quora URL for the <link> tag
         quora_url = find_best_quora_url(post, resolved_quora_username, check_online)
@@ -670,9 +767,6 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
         if "brouillon" in post["type"].lower() or "draft" in post["type"].lower():
             status = "draft"
             
-        # Unique post ID
-        post_id = idx
-        
         # Categories & tags
         cats_and_tags = []
         
@@ -785,10 +879,11 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
 		<wp:post_password><![CDATA[]]></wp:post_password>
 		<wp:is_sticky>0</wp:is_sticky>
 		{cats_xml}
+{thumbnail_meta_xml}
 {comments_xml_str}
 	</item>
 """
-        return idx, item_xml, content, comments_xml_str
+        return idx, item_xml, content, comments_xml_str, attachment_items_xml
 
     import time
     import signal
@@ -802,14 +897,24 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
     old_sigint = signal.signal(signal.SIGINT, handle_cancel_signal)
     old_sigterm = signal.signal(signal.SIGTERM, handle_cancel_signal)
 
+    test_image_count = 0
+
     try:
         for idx, post in enumerate(posts, start=1):
             if interrupted[0]:
                 print(f"\n--> Interruption confirmée ! {idx-1} articles sur {total_posts} ont été sauvegardés.", flush=True)
                 break
 
-            idx, item_xml, content, comments_xml_str = process_single_post((idx, post))
+            raw_content = post.get("Content", post.get("Post content", ""))
+            has_image = "<img" in (raw_content or "").lower()
+
+            if test_mode and not has_image:
+                continue
+
+            idx, item_xml, content, comments_xml_str, attachment_items_xml = process_single_post((idx, post))
             xml.append(item_xml)
+            if attachment_items_xml:
+                xml.extend(attachment_items_xml)
             
             # Write to file progressively if output_file is provided
             if output_file:
@@ -826,8 +931,9 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
                     sys.stderr.write(f"Error writing progressive XML to '{output_file}': {fe}\n")
             
             if test_mode:
+                test_image_count += 1
                 # Check for active chrome processes after converting each article
-                time.sleep(1)  # small grace period for clean driver shutdown
+                time.sleep(0.5)  # small grace period for clean driver shutdown
                 active_chrome = get_active_chrome_processes()
                 if active_chrome:
                     print(f"  [Test Mode] WARNING: Active Chrome processes detected after converting post {idx}:")
@@ -840,15 +946,10 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
                         except Exception:
                             pass
                 else:
-                    print(f"  [Test Mode] Verification: No active Chrome processes detected after converting post {idx}.", flush=True)
+                    print(f"  [Test Mode] Verification ({test_image_count}/10 images): No active Chrome processes detected after converting post {idx}.", flush=True)
 
-                has_image = "<img" in content.lower()
-                has_comments = bool(comments_xml_str.strip())
-                if has_image and has_comments:
-                    print(f"  --> Test mode: Found post with both images and comments! Early exit triggered.")
-                    break
-                if idx >= 30:
-                    print(f"  --> Test mode: Reached backup limit of 30 processed posts. Stopping early.")
+                if test_image_count >= 10:
+                    print(f"  --> Test mode: Reached maximum limit of 10 posts containing images. Stopping early.")
                     break
     finally:
         try:
@@ -911,7 +1012,7 @@ def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
         
     return posts
 
-def process_folder(folder_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_folder(folder_path, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the folder and return the WXR XML content if posts found."""
     folder_name = os.path.basename(folder_path)
     index_path = os.path.join(folder_path, "index.html")
@@ -926,10 +1027,10 @@ def process_folder(folder_path, image_base_url, author, author_email, include_dr
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, author, author_email, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def process_zip(zip_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_zip(zip_path, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the zip file and return the WXR XML content if posts found."""
     folder_name = os.path.splitext(os.path.basename(zip_path))[0]
     
@@ -953,10 +1054,10 @@ def process_zip(zip_path, image_base_url, author, author_email, include_drafts, 
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, author, author_email, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def run_conversion(input_path, output_dir, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def run_conversion(input_path, output_dir, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Processes input_path (which can be a single zip, single folder, or dir of folders/zips) and saves WXR to output_dir."""
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Error: Input path '{input_path}' does not exist.")
@@ -999,7 +1100,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
                 folder_name = os.path.splitext(name)[0]
                 output_file = os.path.join(output_dir, f"{folder_name}.xml")
                 wxr_content, post_count = process_zip(
-                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, author, author_email, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
@@ -1016,7 +1117,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
             try:
                 output_file = os.path.join(output_dir, f"{name}.xml")
                 wxr_content, post_count = process_folder(
-                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, author, author_email, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
