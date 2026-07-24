@@ -56,4 +56,6 @@ Available options:
 * `--check-online`: Enable online verification of candidate URLs to ensure links are active (can be slow or blocked by Cloudflare)
 * `--scrape-topics`: Automatically retrieve Quora tags/topics for each converted post (`True` or `False`, default: `True`)
 * `--scrape-comments`: Automatically retrieve comments and nested replies for each converted post (`True` or `False`, default: `False`)
+* `--link-position`: Position to insert backlink to Quora in post content (`none`, `top`, or `bottom`, default: `none`)
+* `--link-template`: HTML link template with `$link$` placeholder (default: `<a href="$link$" target="_blank">voir sur Quora</a>`)
 * `--test`: Test mode. Stops conversion as soon as a post containing both images and comments is processed (or after a maximum of 30 posts) to quickly validate scraping functionality without converting the entire export.

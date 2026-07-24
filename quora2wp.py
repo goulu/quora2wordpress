@@ -20,6 +20,15 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected (true/false).')
 
 def main():
+    config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+    saved_cfg = {}
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                saved_cfg = json.load(f)
+        except Exception:
+            pass
+
     parser = argparse.ArgumentParser(
         description="Convert local Quora export folders (index.html) or .zip archives to WordPress WXR format",
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -47,57 +56,58 @@ def main():
     
     parser.add_argument(
         "--image-base-url", 
-        default="/wp-content/uploads/quora", 
+        default=saved_cfg.get("image_base_url", "/wp-content/uploads/quora"), 
         help="Base URL prefix for rewriting images (default: /wp-content/uploads/quora)"
     )
     parser.add_argument(
         "--author", 
-        default="", 
+        default=saved_cfg.get("author", ""), 
         help="Default author display name for the posts (default: extracted from folder name)"
     )
     parser.add_argument(
         "--author-email", 
-        default="", 
+        default=saved_cfg.get("author_email", ""), 
         help="Default author email for the WXR header"
     )
     parser.add_argument(
         "--include-drafts", 
         type=str2bool, 
-        default=True, 
+        default=saved_cfg.get("include_drafts", True), 
         help="Include draft posts (default: True)"
     )
     parser.add_argument(
         "--include-space-posts", 
         type=str2bool, 
-        default=True, 
+        default=saved_cfg.get("include_space_posts", True), 
         help="Include space posts and shares (default: True)"
     )
     parser.add_argument(
         "--use-cdn-images",
         type=str2bool,
-        default=True,
+        default=saved_cfg.get("use_cdn_images", True),
         help="Rewrite image sources containing qimg- to Quora CDN URLs (default: True)"
     )
     parser.add_argument(
         "--quora-username",
-        default="",
+        default=saved_cfg.get("quora_username", ""),
         help="The Quora profile username slug (e.g. Dr-Goulu) to reconstruct valid answer URLs (default: derived from folder name)"
     )
     parser.add_argument(
         "--check-online",
         action="store_true",
+        default=saved_cfg.get("check_online", False),
         help="Check candidates against Quora online to verify link validity (may be slow/blocked by Cloudflare)"
     )
     parser.add_argument(
         "--scrape-topics",
         type=str2bool,
-        default=True,
+        default=saved_cfg.get("scrape_topics", True),
         help="Automatically scrape Quora topics/tags for each post (default: True)"
     )
     parser.add_argument(
         "--scrape-comments",
         type=str2bool,
-        default=False,
+        default=saved_cfg.get("scrape_comments", False),
         help="Automatically scrape Quora comments/replies for each post (default: False)"
     )
     parser.add_argument(
@@ -107,8 +117,20 @@ def main():
         help="Deprecated/Ignored: conversion is now strictly sequential to avoid Chrome memory saturation (default: 1)"
     )
     parser.add_argument(
+        "--link-position",
+        choices=["none", "top", "bottom"],
+        default=saved_cfg.get("link_position", "none"),
+        help="Position to insert link to Quora in post content (none, top, or bottom; default: none)"
+    )
+    parser.add_argument(
+        "--link-template",
+        default=saved_cfg.get("link_template", '<a href="$link$" target="_blank">voir sur Quora</a>'),
+        help='HTML template for Quora link, using $link$ as URL variable (default: \'<a href="$link$" target="_blank">voir sur Quora</a>\')'
+    )
+    parser.add_argument(
         "--test",
         action="store_true",
+        default=saved_cfg.get("test_mode", False),
         help="Stop conversion early as soon as posts containing both images and comments are found"
     )
 
@@ -124,6 +146,9 @@ def main():
 
     if not args.input_path:
         parser.error("the following arguments are required: input_path (unless --web is specified)")
+
+    if not args.quora_username or not args.quora_username.strip():
+        parser.error("the following argument is required: --quora-username (le slug du profil Quora est obligatoire)")
 
     # Fallback logic for output_dir
     input_path = args.input_path
@@ -149,7 +174,9 @@ def main():
             scrape_topics=args.scrape_topics,
             scrape_comments=args.scrape_comments,
             test_mode=args.test,
-            max_processes=args.max_processes
+            max_processes=args.max_processes,
+            link_position=args.link_position,
+            link_template=args.link_template
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

@@ -291,7 +291,8 @@ body {
 }
 
 .quora-form-group input[type="text"],
-.quora-form-group input[type="email"] {
+.quora-form-group input[type="email"],
+.quora-select {
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
@@ -302,7 +303,13 @@ body {
     transition: border-color 0.2s;
 }
 
-.quora-form-group input:focus {
+.quora-select option {
+    background-color: #1e1e2e;
+    color: #ffffff;
+}
+
+.quora-form-group input:focus,
+.quora-select:focus {
     border-color: var(--accent-purple);
 }
 
@@ -383,6 +390,24 @@ body {
 
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f38ba8 0%, var(--accent-red) 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(243, 139, 168, 0.3);
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(185, 43, 39, 0.4);
 }
 
 /* Progress & Terminal Log */

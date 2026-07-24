@@ -8,18 +8,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 def log_lifecycle(message):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    if os.path.basename(script_dir) == 'quora2wp':
-        log_path = os.path.join(os.path.dirname(script_dir), "chrome_lifecycle.log")
-    else:
-        log_path = os.path.join(script_dir, "chrome_lifecycle.log")
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pid = os.getpid()
-    try:
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] [PYTHON PID {pid}] {message}\n")
-    except Exception as e:
-        sys.stderr.write(f"Failed to write to chrome_lifecycle.log: {e}\n")
+    pass
 
 def expand_all_comments(driver):
     """Attempt to click expand buttons and load collapsed comment threads."""

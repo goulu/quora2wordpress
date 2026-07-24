@@ -567,7 +567,7 @@ def get_active_chrome_processes():
                 continue
     return active
 
-def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None):
+def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Generate a valid WXR XML string from a list of post dictionaries."""
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
@@ -656,6 +656,14 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
             lang = post.get('Content language', 'français').lower()
             domain = 'fr.quora.com' if 'fran' in lang else 'www.quora.com'
             quora_url = f"https://{domain}/{post_name}"
+
+        # Add link to Quora in content if requested
+        if link_position in ['top', 'bottom'] and link_template and quora_url:
+            link_html = link_template.replace('$link$', quora_url)
+            if link_position == 'top':
+                content = f"{link_html}\n\n{content}"
+            elif link_position == 'bottom':
+                content = f"{content}\n\n{link_html}"
             
         # Map statuses
         status = "publish"
@@ -785,54 +793,81 @@ def generate_wxr(posts, folder_name, image_base_url, author, author_email, use_c
     import time
     import signal
 
-    # Always process sequentially to avoid Chrome process memory saturation
-    for idx, post in enumerate(posts, start=1):
-        idx, item_xml, content, comments_xml_str = process_single_post((idx, post))
-        xml.append(item_xml)
-        
-        # Write to file progressively if output_file is provided
-        if output_file:
-            try:
-                out_dir = os.path.dirname(output_file)
-                if out_dir:
-                    os.makedirs(out_dir, exist_ok=True)
-                
-                # build a temporary XML string with the current channel closed
-                current_xml = xml + ["</channel>\n</rss>"]
-                with open(output_file, "w", encoding="utf-8", errors="replace") as f:
-                    f.write('\n'.join(current_xml))
-            except Exception as fe:
-                sys.stderr.write(f"Error writing progressive XML to '{output_file}': {fe}\n")
-        
-        if test_mode:
-            # Check for active chrome processes after converting each article
-            time.sleep(1)  # small grace period for clean driver shutdown
-            active_chrome = get_active_chrome_processes()
-            if active_chrome:
-                print(f"  [Test Mode] WARNING: Active Chrome processes detected after converting post {idx}:")
-                for pid, comm, cmdline in active_chrome:
-                    print(f"    - PID {pid}: {comm} ({cmdline[:80]}...)")
-                print("  [Test Mode] Terminating active Chrome processes to free memory...")
-                for pid, _, _ in active_chrome:
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                    except Exception:
-                        pass
-            else:
-                print(f"  [Test Mode] Verification: No active Chrome processes detected after converting post {idx}.", flush=True)
+    interrupted = [False]
 
-            has_image = "<img" in content.lower()
-            has_comments = bool(comments_xml_str.strip())
-            if has_image and has_comments:
-                print(f"  --> Test mode: Found post with both images and comments! Early exit triggered.")
+    def handle_cancel_signal(sig, frame):
+        interrupted[0] = True
+        sys.stderr.write("\n[Interruption] Signal d'arrêt reçu, finalisation du fichier WXR partiel...\n")
+
+    old_sigint = signal.signal(signal.SIGINT, handle_cancel_signal)
+    old_sigterm = signal.signal(signal.SIGTERM, handle_cancel_signal)
+
+    try:
+        for idx, post in enumerate(posts, start=1):
+            if interrupted[0]:
+                print(f"\n--> Interruption confirmée ! {idx-1} articles sur {total_posts} ont été sauvegardés.", flush=True)
                 break
-            if idx >= 30:
-                print(f"  --> Test mode: Reached backup limit of 30 processed posts. Stopping early.")
-                break
-        
+
+            idx, item_xml, content, comments_xml_str = process_single_post((idx, post))
+            xml.append(item_xml)
+            
+            # Write to file progressively if output_file is provided
+            if output_file:
+                try:
+                    out_dir = os.path.dirname(output_file)
+                    if out_dir:
+                        os.makedirs(out_dir, exist_ok=True)
+                    
+                    # build a temporary XML string with the current channel closed
+                    current_xml = xml + ["</channel>\n</rss>"]
+                    with open(output_file, "w", encoding="utf-8", errors="replace") as f:
+                        f.write('\n'.join(current_xml))
+                except Exception as fe:
+                    sys.stderr.write(f"Error writing progressive XML to '{output_file}': {fe}\n")
+            
+            if test_mode:
+                # Check for active chrome processes after converting each article
+                time.sleep(1)  # small grace period for clean driver shutdown
+                active_chrome = get_active_chrome_processes()
+                if active_chrome:
+                    print(f"  [Test Mode] WARNING: Active Chrome processes detected after converting post {idx}:")
+                    for pid, comm, cmdline in active_chrome:
+                        print(f"    - PID {pid}: {comm} ({cmdline[:80]}...)")
+                    print("  [Test Mode] Terminating active Chrome processes to free memory...")
+                    for pid, _, _ in active_chrome:
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except Exception:
+                            pass
+                else:
+                    print(f"  [Test Mode] Verification: No active Chrome processes detected after converting post {idx}.", flush=True)
+
+                has_image = "<img" in content.lower()
+                has_comments = bool(comments_xml_str.strip())
+                if has_image and has_comments:
+                    print(f"  --> Test mode: Found post with both images and comments! Early exit triggered.")
+                    break
+                if idx >= 30:
+                    print(f"  --> Test mode: Reached backup limit of 30 processed posts. Stopping early.")
+                    break
+    finally:
+        try:
+            signal.signal(signal.SIGINT, old_sigint)
+            signal.signal(signal.SIGTERM, old_sigterm)
+        except Exception:
+            pass
+
     xml.append("""</channel>
 </rss>""")
-    return '\n'.join(xml)
+    final_wxr = '\n'.join(xml)
+    if output_file:
+        try:
+            with open(output_file, "w", encoding="utf-8", errors="replace") as f:
+                f.write(final_wxr)
+        except Exception as e:
+            sys.stderr.write(f"Error final writing XML to '{output_file}': {e}\n")
+
+    return final_wxr
 
 def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
     """Common extraction logic to parse post structures from index.html BeautifulSoup."""
@@ -876,7 +911,7 @@ def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
         
     return posts
 
-def process_folder(folder_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None):
+def process_folder(folder_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the folder and return the WXR XML content if posts found."""
     folder_name = os.path.basename(folder_path)
     index_path = os.path.join(folder_path, "index.html")
@@ -891,10 +926,10 @@ def process_folder(folder_path, image_base_url, author, author_email, include_dr
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file)
+    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def process_zip(zip_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None):
+def process_zip(zip_path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the zip file and return the WXR XML content if posts found."""
     folder_name = os.path.splitext(os.path.basename(zip_path))[0]
     
@@ -918,10 +953,10 @@ def process_zip(zip_path, image_base_url, author, author_email, include_drafts, 
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file)
+    wxr_content = generate_wxr(posts, folder_name, image_base_url, author, author_email, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def run_conversion(input_path, output_dir, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3):
+def run_conversion(input_path, output_dir, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images=True, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Processes input_path (which can be a single zip, single folder, or dir of folders/zips) and saves WXR to output_dir."""
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Error: Input path '{input_path}' does not exist.")
@@ -964,7 +999,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
                 folder_name = os.path.splitext(name)[0]
                 output_file = os.path.join(output_dir, f"{folder_name}.xml")
                 wxr_content, post_count = process_zip(
-                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file
+                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
@@ -981,7 +1016,7 @@ def run_conversion(input_path, output_dir, image_base_url, author, author_email,
             try:
                 output_file = os.path.join(output_dir, f"{name}.xml")
                 wxr_content, post_count = process_folder(
-                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file
+                    path, image_base_url, author, author_email, include_drafts, include_space_posts, use_cdn_images, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:

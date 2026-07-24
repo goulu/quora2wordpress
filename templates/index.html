@@ -76,15 +76,31 @@
                             </div>
 
                             <div class="quora-form-group">
-                                <label for="quora-username">Identifiant Quora (slug) :</label>
-                                <input type="text" id="quora-username" name="quora_username" placeholder="ex: Dr-Goulu" />
-                                <span class="help-desc">Slug du profil Quora pour reconstruire les liens originaux.</span>
+                                <label for="quora-username">Identifiant Quora (slug) <span style="color: #f38ba8;">*</span> :</label>
+                                <input type="text" id="quora-username" name="quora_username" placeholder="ex: Dr-Goulu" required />
+                                <span class="help-desc">Slug du profil Quora pour reconstruire les liens originaux (obligatoire).</span>
                             </div>
 
                             <div class="quora-form-group">
                                 <label for="quora-image-base-url">URL de base des images :</label>
                                 <input type="text" id="quora-image-base-url" name="image_base_url" value="/wp-content/uploads/quora" />
                                 <span class="help-desc">Préfixe pour la réécriture des images locales si non hébergées sur le CDN.</span>
+                            </div>
+
+                            <div class="quora-form-group">
+                                <label for="quora-link-position">Lien vers Quora dans l'article :</label>
+                                <select name="link_position" id="quora-link-position" class="quora-select">
+                                    <option value="none" selected>Non</option>
+                                    <option value="top">Au début de l'article</option>
+                                    <option value="bottom">À la fin de l'article</option>
+                                </select>
+                                <span class="help-desc">Insérer un lien cliquable vers la publication originale sur Quora.</span>
+                            </div>
+
+                            <div class="quora-form-group" id="quora-link-template-group" style="display: none;">
+                                <label for="quora-link-template">Modèle de lien (HTML) :</label>
+                                <input type="text" id="quora-link-template" name="link_template" value='<a href="$link$" target="_blank">voir sur Quora</a>' />
+                                <span class="help-desc">Variable $link$ remplacée par l'URL Quora.</span>
                             </div>
                         </div>
                     </div>
@@ -183,6 +199,11 @@
                         <span class="terminal-title">quora2wp command output</span>
                     </div>
                     <pre class="terminal-body" id="quora-log-console">Waiting for execution...</pre>
+                </div>
+                <div class="quora-form-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn-danger" id="quora-cancel-convert-btn">
+                        <i class="fa-solid fa-hand"></i> Arrêter la conversion
+                    </button>
                 </div>
             </div>
 

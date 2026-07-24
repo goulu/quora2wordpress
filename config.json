@@ -1,0 +1,15 @@
+{
+  "author": "",
+  "author_email": "",
+  "quora_username": "",
+  "image_base_url": "/wp-content/uploads/quora",
+  "link_position": "none",
+  "link_template": "<a href=\"$link$\" target=\"_blank\">voir sur Quora</a>",
+  "include_drafts": true,
+  "include_space_posts": true,
+  "use_cdn_images": true,
+  "scrape_topics": true,
+  "scrape_comments": false,
+  "check_online": false,
+  "test_mode": false
+}

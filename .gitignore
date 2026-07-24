@@ -13,6 +13,7 @@ env/
 *.xml
 content/
 exports/
+uploads/
 quora_importer_chrome_profile/
 tests/
 
