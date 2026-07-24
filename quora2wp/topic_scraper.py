@@ -8,21 +8,21 @@ import datetime
 def log_lifecycle(message):
     pass
 
-def scrape_topics_from_url(url):
+def fetch_html_from_url(url):
     """
-    Scrapes topic names associated with a Quora URL using 4 fallback scraping methods:
+    Fetches raw HTML for a Quora URL using 5 fallback scraping methods:
     1. cloudscraper (to handle Cloudflare bypass)
     2. requests
     3. urllib
-    4. Selenium Chrome (headless)
-    Returns a dictionary: {"success": bool, "topics": list, "error": str}
+    4. curl CLI
+    5. Selenium Chrome (headless)
+    Returns (success, html, error_msg)
     """
     html = ""
     success = False
     error_msg = "Could not fetch URL"
     status_code = 0
 
-    # Ensure standard system paths are in environment for selenium/chromedriver
     os.environ["PATH"] = "/usr/bin:/bin:/usr/local/bin:" + os.environ.get("PATH", "")
 
     # Method 1: cloudscraper
@@ -115,13 +115,7 @@ def scrape_topics_from_url(url):
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             
-            log_lifecycle(f"topic_scraper: CREATING Chrome webdriver for URL: {url}")
             driver = webdriver.Chrome(options=options)
-            cd_pid = "unknown"
-            if hasattr(driver, 'service') and driver.service and hasattr(driver.service, 'process') and driver.service.process:
-                cd_pid = driver.service.process.pid
-            log_lifecycle(f"topic_scraper: CREATED Chrome webdriver (chromedriver PID={cd_pid})")
-            
             driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
                 "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             })
@@ -147,23 +141,20 @@ def scrape_topics_from_url(url):
                 success = True
         except Exception as e:
             error_msg = f"selenium: {str(e)}"
-            log_lifecycle(f"topic_scraper: EXCEPTION in selenium block: {e}")
         finally:
             if driver:
                 try:
-                    cd_pid = "unknown"
-                    if hasattr(driver, 'service') and driver.service and hasattr(driver.service, 'process') and driver.service.process:
-                        cd_pid = driver.service.process.pid
-                    log_lifecycle(f"topic_scraper: QUITTING Chrome webdriver (chromedriver PID={cd_pid})")
                     driver.quit()
-                    log_lifecycle(f"topic_scraper: QUIT Chrome webdriver successfully (chromedriver PID={cd_pid})")
-                except Exception as ex:
-                    log_lifecycle(f"topic_scraper: ERROR quitting Chrome webdriver (chromedriver PID={cd_pid}): {ex}")
+                except Exception:
+                    pass
 
-    if not success:
-        return {"success": False, "error": error_msg, "topics": []}
+    return success, html, error_msg
 
-    # Extract topics using JSON regex pattern
+def extract_topics_from_html(html):
+    """Extract topic names from Quora HTML string using JSON regex pattern."""
+    if not html:
+        return []
+
     pattern = r'\\*\"url\\*\":\\*\"((?:https?://[^\"/\\ ]+)?/topic/(?:[^\"\\]|\\.)*?)\\*\",\\*\"name\\*\":\\*\"((?:[^\"\\]|\\.)*?)\\*\"'
     matches = re.findall(pattern, html)
 
@@ -180,4 +171,13 @@ def scrape_topics_from_url(url):
         if decoded_name and decoded_name not in topics and len(decoded_name) < 50:
             topics.append(decoded_name)
 
+    return topics
+
+def scrape_topics_from_url(url):
+    """Scrapes topic names associated with a Quora URL."""
+    success, html, error_msg = fetch_html_from_url(url)
+    if not success or not html:
+        return {"success": False, "error": error_msg, "topics": []}
+
+    topics = extract_topics_from_html(html)
     return {"success": True, "topics": topics}

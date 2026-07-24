@@ -46,8 +46,6 @@ Positional arguments:
 * `output_dir` (Optional): Destination folder for generated WXR XML files. If not specified, WXR files will be saved in the same location as `input_path`.
 
 Available options:
-* `--author`: Default author display name for the posts (default: extracted from folder name)
-* `--author-email`: Default author email for the WXR header
 * `--include-drafts`: Include draft posts (`True` or `False`, default: `True`)
 * `--include-space-posts`: Include space posts and shares (`True` or `False`, default: `True`)
 * `--quora-username`: Quora profile username slug (e.g. `Dr-Goulu`) to reconstruct valid answer URLs (default: derived from folder name)

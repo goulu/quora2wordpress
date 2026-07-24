@@ -1,6 +1,4 @@
 {
-  "author": "",
-  "author_email": "",
   "quora_username": "Dr-Goulu",
   "link_position": "top",
   "link_template": "<a href=\"$link$\" target=\"_blank\">voir sur Quora</a>",
@@ -8,6 +6,5 @@
   "include_space_posts": true,
   "scrape_topics": true,
   "scrape_comments": false,
-  "check_online": false,
   "test_mode": true
 }

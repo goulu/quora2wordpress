@@ -64,18 +64,6 @@
                         <h4><i class="fa-solid fa-user"></i> 1. Paramètres d'Auteur & Profil</h4>
                         <div class="quora-form-grid">
                             <div class="quora-form-group">
-                                <label for="quora-author">Nom de l'auteur :</label>
-                                <input type="text" id="quora-author" name="author" placeholder="ex: Dr Goulu (par défaut extrait du nom)" />
-                                <span class="help-desc">Nom d'affichage de l'auteur dans les articles WordPress.</span>
-                            </div>
-
-                            <div class="quora-form-group">
-                                <label for="quora-author-email">Courriel de l'auteur :</label>
-                                <input type="email" id="quora-author-email" name="author_email" placeholder="ex: auteur@exemple.com" />
-                                <span class="help-desc">Adresse email incluse dans l'en-tête du fichier WXR.</span>
-                            </div>
-
-                            <div class="quora-form-group">
                                 <label for="quora-username">Identifiant Quora (slug) <span style="color: #f38ba8;">*</span> :</label>
                                 <input type="text" id="quora-username" name="quora_username" placeholder="ex: Dr-Goulu" required />
                                 <span class="help-desc">Slug du profil Quora pour reconstruire les liens originaux (obligatoire).</span>
@@ -138,14 +126,6 @@
                                 <div>
                                     <strong>Extraire les Commentaires & Réponses</strong>
                                     <span class="help-desc">Scraper les commentaires et leurs réponses imbriquées (nécessite Chrome/Selenium).</span>
-                                </div>
-                            </label>
-
-                            <label class="quora-checkbox-label">
-                                <input type="checkbox" name="check_online" id="quora-check-online" />
-                                <div>
-                                    <strong>Vérification en ligne des liens</strong>
-                                    <span class="help-desc">Vérifier la validité des URL directes sur Quora (peut être ralenti ou bloqué par Cloudflare).</span>
                                 </div>
                             </label>
 

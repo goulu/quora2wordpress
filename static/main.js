@@ -211,8 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) return;
             const cfg = await response.json();
 
-            if (cfg.author !== undefined) document.getElementById('quora-author').value = cfg.author;
-            if (cfg.author_email !== undefined) document.getElementById('quora-author-email').value = cfg.author_email;
             if (cfg.quora_username !== undefined) document.getElementById('quora-username').value = cfg.quora_username;
 
             if (cfg.link_position !== undefined && linkPositionSelect && linkTemplateGroup) {
@@ -260,18 +258,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const requestData = {
             session_id: currentSessionId,
             files: uploadedFiles.map(f => f.filename),
-            author: formData.get('author') || '',
-            author_email: formData.get('author_email') || '',
-            quora_username: formData.get('quora_username') || '',
-            image_base_url: formData.get('image_base_url') || '/wp-content/uploads/quora',
+            quora_username: usernameVal,
             link_position: formData.get('link_position') || 'none',
             link_template: formData.get('link_template') || '<a href="$link$" target="_blank">voir sur Quora</a>',
             include_drafts: formData.get('include_drafts') === 'on',
             include_space_posts: formData.get('include_space_posts') === 'on',
-            use_cdn_images: formData.get('use_cdn_images') === 'on',
             scrape_topics: formData.get('scrape_topics') === 'on',
             scrape_comments: formData.get('scrape_comments') === 'on',
-            check_online: formData.get('check_online') === 'on',
             test_mode: formData.get('test_mode') === 'on'
         };
 

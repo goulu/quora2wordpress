@@ -583,7 +583,7 @@ def get_active_chrome_processes():
                 continue
     return active
 
-def generate_wxr(posts, folder_name, author, author_email, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Generate a valid WXR XML string from a list of post dictionaries."""
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
@@ -592,9 +592,9 @@ def generate_wxr(posts, folder_name, author, author_email, quora_username=None, 
     
     # Try to determine author name
     extracted_author = extract_author_from_folder(folder_name)
-    author_display = author if author else (extracted_author if extracted_author else "Admin")
+    author_display = quora_username if quora_username else (extracted_author if extracted_author else "Admin")
     author_login = slugify(author_display)
-    author_email_str = author_email if author_email else f"{author_login}@localhost"
+    author_email_str = f"{author_login}@localhost"
     
     # Resolve the default quora username to use for link generation
     resolved_quora_username = quora_username
@@ -746,15 +746,51 @@ def generate_wxr(posts, folder_name, author, author_email, quora_username=None, 
 			<wp:meta_value><![CDATA[{first_attachment_id}]]></wp:meta_value>
 		</wp:postmeta>"""
         
-        # Reconstruct the correct Quora URL for the <link> tag
-        quora_url = find_best_quora_url(post, resolved_quora_username, check_online)
-        if not quora_url:
-            # General fallback
+        # Single Web Fetching Phase (URL Verification, Topics, Comments)
+        quora_url = None
+        html_captured = None
+        extracted_topics = []
+        extracted_comments = []
+
+        need_web_fetch = (link_position in ['top', 'bottom']) or scrape_topics or scrape_comments
+        if need_web_fetch:
+            candidate_urls = get_candidate_urls(post, resolved_quora_username)
+            for candidate in candidate_urls:
+                if scrape_comments:
+                    try:
+                        from quora2wp.comment_scraper import scrape_comments_from_urls
+                        res = scrape_comments_from_urls([candidate])
+                        if res.get("success") and res.get("resolved_url"):
+                            quora_url = res["resolved_url"]
+                            extracted_comments = res.get("comments", [])
+                            html_captured = res.get("html", "")
+                            if scrape_topics and html_captured:
+                                from quora2wp.topic_scraper import extract_topics_from_html
+                                extracted_topics = extract_topics_from_html(html_captured)
+                            break
+                    except Exception as e:
+                        print(f"  [{idx}/{total_posts}]   - Web fetch error: {e}", flush=True, file=sys.stderr)
+                else:
+                    try:
+                        from quora2wp.topic_scraper import fetch_html_from_url, extract_topics_from_html
+                        success, html, err = fetch_html_from_url(candidate)
+                        if success and html:
+                            quora_url = candidate
+                            html_captured = html
+                            if scrape_topics:
+                                extracted_topics = extract_topics_from_html(html_captured)
+                            break
+                    except Exception as e:
+                        print(f"  [{idx}/{total_posts}]   - Web fetch error: {e}", flush=True, file=sys.stderr)
+
+        # Fallback URL for WXR <link> element if no online verification was run or succeeded
+        quora_url_for_tag = quora_url
+        if not quora_url_for_tag:
             lang = post.get('Content language', 'français').lower()
             domain = 'fr.quora.com' if 'fran' in lang else 'www.quora.com'
-            quora_url = f"https://{domain}/{post_name}"
+            quora_url_for_tag = f"https://{domain}/{post_name}"
 
-        # Add link to Quora in content if requested
+        # Add link to Quora in content ONLY if URL was verified online
         if link_position in ['top', 'bottom'] and link_template and quora_url:
             link_html = link_template.replace('$link$', quora_url)
             if link_position == 'top':
@@ -793,48 +829,36 @@ def generate_wxr(posts, folder_name, author, author_email, quora_username=None, 
         # Global Quora tag
         cats_and_tags.append('<category domain="post_tag" nicename="quora"><![CDATA[Quora]]></category>')
         
-        # Automatic Scraping of Topics (Tags)
-        if scrape_topics and quora_url:
-            try:
-                from quora2wp.topic_scraper import scrape_topics_from_url
-                topics_result = scrape_topics_from_url(quora_url)
-                if topics_result.get("success") and topics_result.get("topics"):
-                    for topic in topics_result["topics"]:
-                        tag_xml = f'<category domain="post_tag" nicename="{slugify(topic)}"><![CDATA[{escape_cdata(topic)}]]></category>'
-                        if tag_xml not in cats_and_tags:
-                            cats_and_tags.append(tag_xml)
-                    print(f"  [{idx}/{total_posts}]   - Topics: Success (found {len(topics_result['topics'])} topics)", flush=True, file=sys.stderr)
-                else:
-                    pass
-            except Exception as e:
-                print(f"  [{idx}/{total_posts}]   - Topics error: {e}", flush=True, file=sys.stderr)
-                
-        # Automatic Scraping of Comments
+        # Add extracted topics from single fetch
+        if extracted_topics:
+            for topic in extracted_topics:
+                tag_xml = f'<category domain="post_tag" nicename="{slugify(topic)}"><![CDATA[{escape_cdata(topic)}]]></category>'
+                if tag_xml not in cats_and_tags:
+                    cats_and_tags.append(tag_xml)
+            print(f"  [{idx}/{total_posts}]   - Topics: Success (found {len(extracted_topics)} topics)", flush=True, file=sys.stderr)
+
+        # Process extracted comments from single fetch
         comments_xml_str = ""
-        if scrape_comments and quora_url:
-            try:
-                from quora2wp.comment_scraper import scrape_comments_from_urls
-                comments_result = scrape_comments_from_urls([quora_url])
-                if comments_result.get("success") and comments_result.get("comments"):
-                    base_comment_id = idx * 10000
-                    id_to_int = {}
-                    for c_idx, c in enumerate(comments_result["comments"], start=1):
-                        id_to_int[c["id"]] = base_comment_id + c_idx
-                        
-                    comments_list = []
-                    for c_idx, c in enumerate(comments_result["comments"], start=1):
-                        c_int_id = id_to_int[c["id"]]
-                        parent_int_id = 0
-                        if c.get("parent_id") and c["parent_id"] in id_to_int:
-                            parent_int_id = id_to_int[c["parent_id"]]
-                            
-                        c_date, c_date_gmt = parse_comment_date_helper(c.get("date"), post_date)
-                        
-                        profile_url = c.get("profile_url", "")
-                        if profile_url and not profile_url.startswith("http"):
-                            profile_url = f"https://www.quora.com{profile_url}"
-                            
-                        comments_list.append(f"""		<wp:comment>
+        if extracted_comments:
+            base_comment_id = idx * 10000
+            id_to_int = {}
+            for c_idx, c in enumerate(extracted_comments, start=1):
+                id_to_int[c["id"]] = base_comment_id + c_idx
+                
+            comments_list = []
+            for c_idx, c in enumerate(extracted_comments, start=1):
+                c_int_id = id_to_int[c["id"]]
+                parent_int_id = 0
+                if c.get("parent_id") and c["parent_id"] in id_to_int:
+                    parent_int_id = id_to_int[c["parent_id"]]
+                    
+                c_date, c_date_gmt = parse_comment_date_helper(c.get("date"), post_date)
+                
+                profile_url = c.get("profile_url", "")
+                if profile_url and not profile_url.startswith("http"):
+                    profile_url = f"https://www.quora.com{profile_url}"
+                    
+                comments_list.append(f"""		<wp:comment>
 			<wp:comment_id>{c_int_id}</wp:comment_id>
 			<wp:comment_author><![CDATA[{escape_cdata(c.get('author', 'Anonyme'))}]]></wp:comment_author>
 			<wp:comment_author_email><![CDATA[]]></wp:comment_author_email>
@@ -848,18 +872,14 @@ def generate_wxr(posts, folder_name, author, author_email, quora_username=None, 
 			<wp:comment_parent>{parent_int_id}</wp:comment_parent>
 			<wp:comment_user_id>0</wp:comment_user_id>
 		</wp:comment>""")
-                    comments_xml_str = "\n".join(comments_list)
-                    print(f"  [{idx}/{total_posts}]   - Comments: Success (found {len(comments_result['comments'])} comments)", flush=True, file=sys.stderr)
-                else:
-                    pass
-            except Exception as e:
-                print(f"  [{idx}/{total_posts}]   - Comments error: {e}", flush=True, file=sys.stderr)
+            comments_xml_str = "\n".join(comments_list)
+            print(f"  [{idx}/{total_posts}]   - Comments: Success (found {len(extracted_comments)} comments)", flush=True, file=sys.stderr)
 
         cats_xml = "\n\t\t".join(cats_and_tags)
         
         item_xml = f"""	<item>
 		<title><![CDATA[{escape_cdata(title)}]]></title>
-		<link>{escape_cdata(quora_url)}</link>
+		<link>{escape_cdata(quora_url_for_tag)}</link>
 		<pubDate>{item_pub_date}</pubDate>
 		<dc:creator><![CDATA[{author_login}]]></dc:creator>
 		<guid isPermaLink="false">{site_link}/?p={post_id}</guid>
@@ -1012,7 +1032,7 @@ def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
         
     return posts
 
-def process_folder(folder_path, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_folder(folder_path, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the folder and return the WXR XML content if posts found."""
     folder_name = os.path.basename(folder_path)
     index_path = os.path.join(folder_path, "index.html")
@@ -1027,10 +1047,10 @@ def process_folder(folder_path, author, author_email, include_drafts, include_sp
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, author, author_email, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def process_zip(zip_path, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def process_zip(zip_path, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Parse index.html in the zip file and return the WXR XML content if posts found."""
     folder_name = os.path.splitext(os.path.basename(zip_path))[0]
     
@@ -1054,10 +1074,10 @@ def process_zip(zip_path, author, author_email, include_drafts, include_space_po
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, author, author_email, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template)
     return wxr_content, len(posts)
 
-def run_conversion(input_path, output_dir, author, author_email, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
+def run_conversion(input_path, output_dir, include_drafts, include_space_posts, quora_username=None, check_online=False, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>'):
     """Processes input_path (which can be a single zip, single folder, or dir of folders/zips) and saves WXR to output_dir."""
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Error: Input path '{input_path}' does not exist.")
@@ -1100,7 +1120,7 @@ def run_conversion(input_path, output_dir, author, author_email, include_drafts,
                 folder_name = os.path.splitext(name)[0]
                 output_file = os.path.join(output_dir, f"{folder_name}.xml")
                 wxr_content, post_count = process_zip(
-                    path, author, author_email, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
@@ -1117,7 +1137,7 @@ def run_conversion(input_path, output_dir, author, author_email, include_drafts,
             try:
                 output_file = os.path.join(output_dir, f"{name}.xml")
                 wxr_content, post_count = process_folder(
-                    path, author, author_email, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
+                    path, include_drafts, include_space_posts, quora_username, check_online, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:

@@ -55,16 +55,6 @@ def main():
     )
     
     parser.add_argument(
-        "--author", 
-        default=saved_cfg.get("author", ""), 
-        help="Default author display name for the posts (default: extracted from folder name)"
-    )
-    parser.add_argument(
-        "--author-email", 
-        default=saved_cfg.get("author_email", ""), 
-        help="Default author email for the WXR header"
-    )
-    parser.add_argument(
         "--include-drafts", 
         type=str2bool, 
         default=saved_cfg.get("include_drafts", True), 
@@ -80,12 +70,6 @@ def main():
         "--quora-username",
         default=saved_cfg.get("quora_username", ""),
         help="The Quora profile username slug (e.g. Dr-Goulu) to reconstruct valid answer URLs (default: derived from folder name)"
-    )
-    parser.add_argument(
-        "--check-online",
-        action="store_true",
-        default=saved_cfg.get("check_online", False),
-        help="Check candidates against Quora online to verify link validity (may be slow/blocked by Cloudflare)"
     )
     parser.add_argument(
         "--scrape-topics",
@@ -152,12 +136,9 @@ def main():
         run_conversion(
             input_path=input_path,
             output_dir=output_dir,
-            author=args.author,
-            author_email=args.author_email,
             include_drafts=args.include_drafts,
             include_space_posts=args.include_space_posts,
             quora_username=args.quora_username,
-            check_online=args.check_online,
             scrape_topics=args.scrape_topics,
             scrape_comments=args.scrape_comments,
             test_mode=args.test,

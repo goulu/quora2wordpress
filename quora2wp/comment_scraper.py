@@ -527,10 +527,10 @@ def scrape_comments_from_urls(urls, gui=False):
                 else:
                     c["parent_id"] = None
                     
-            return {"success": True, "comments": extracted, "resolved_url": successful_url}
+            return {"success": True, "comments": extracted, "resolved_url": successful_url, "html": html}
             
         except Exception as e:
-            return {"success": False, "error": f"Parsing error: {str(e)}", "comments": [], "resolved_url": successful_url}
+            return {"success": False, "error": f"Parsing error: {str(e)}", "comments": [], "resolved_url": successful_url, "html": html}
     finally:
         if os.path.exists(profile_dir) and profile_dir != main_profile_dir:
             try:

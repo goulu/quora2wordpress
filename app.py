@@ -26,8 +26,6 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload limit
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 DEFAULT_CONFIG = {
-    "author": "",
-    "author_email": "",
     "quora_username": "",
     "link_position": "none",
     "link_template": '<a href="$link$" target="_blank">voir sur Quora</a>',
@@ -35,7 +33,6 @@ DEFAULT_CONFIG = {
     "include_space_posts": True,
     "scrape_topics": True,
     "scrape_comments": False,
-    "check_online": False,
     "test_mode": False
 }
 
@@ -135,10 +132,6 @@ def convert():
             ]
 
             # Append option arguments
-            if data.get('author'):
-                cmd.extend(['--author', data['author']])
-            if data.get('author_email'):
-                cmd.extend(['--author-email', data['author_email']])
             if data.get('quora_username'):
                 cmd.extend(['--quora-username', data['quora_username']])
             
@@ -152,8 +145,6 @@ def convert():
                 if data.get('link_template'):
                     cmd.extend(['--link-template', data['link_template']])
                     
-            if data.get('check_online'):
-                cmd.append('--check-online')
             if data.get('test_mode'):
                 cmd.append('--test')
 
