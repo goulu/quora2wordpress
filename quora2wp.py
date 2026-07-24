@@ -107,6 +107,12 @@ def main():
         help="Minimum content character length below which a published post is converted to a draft (default: 0)"
     )
     parser.add_argument(
+        "--r2w-support",
+        type=str2bool,
+        default=saved_cfg.get("r2w_support", False),
+        help="Convert Wikipedia links to Reference 2 Wiki syntax [[lang|article|text]] (default: False)"
+    )
+    parser.add_argument(
         "--test",
         action="store_true",
         default=saved_cfg.get("test_mode", False),
@@ -151,7 +157,8 @@ def main():
             max_processes=args.max_processes,
             link_position=args.link_position,
             link_template=args.link_template,
-            min_content_length=args.min_content_length
+            min_content_length=args.min_content_length,
+            r2w_support=args.r2w_support
         )
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

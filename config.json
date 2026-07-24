@@ -5,6 +5,7 @@
   "include_drafts": true,
   "include_space_posts": true,
   "min_content_length": 500,
+  "r2w_support": true,
   "scrape_topics": true,
   "scrape_comments": false,
   "test_mode": false

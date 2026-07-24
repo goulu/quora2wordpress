@@ -222,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cfg.include_drafts !== undefined) document.getElementById('quora-include-drafts').checked = cfg.include_drafts;
             if (cfg.include_space_posts !== undefined) document.getElementById('quora-include-space-posts').checked = cfg.include_space_posts;
             if (cfg.min_content_length !== undefined) document.getElementById('quora-min-content-length').value = cfg.min_content_length;
+            if (cfg.r2w_support !== undefined) document.getElementById('quora-r2w-support').checked = cfg.r2w_support;
             if (cfg.scrape_topics !== undefined) document.getElementById('quora-scrape-topics').checked = cfg.scrape_topics;
             if (cfg.scrape_comments !== undefined) document.getElementById('quora-scrape-comments').checked = cfg.scrape_comments;
             if (cfg.test_mode !== undefined) document.getElementById('quora-test-mode').checked = cfg.test_mode;
@@ -264,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
             include_drafts: formData.get('include_drafts') === 'on',
             include_space_posts: formData.get('include_space_posts') === 'on',
             min_content_length: parseInt(formData.get('min_content_length') || '0', 10),
+            r2w_support: formData.get('r2w_support') === 'on',
             scrape_topics: formData.get('scrape_topics') === 'on',
             scrape_comments: formData.get('scrape_comments') === 'on',
             test_mode: formData.get('test_mode') === 'on'

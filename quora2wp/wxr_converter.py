@@ -189,7 +189,7 @@ def parse_comment_date_helper(date_str, post_date_str):
     computed = post_dt + datetime.timedelta(days=1)
     return computed.strftime("%Y-%m-%d %H:%M:%S"), computed.strftime("%Y-%m-%d %H:%M:%S")
 
-def process_html_content(content_html, folder_name):
+def process_html_content(content_html, folder_name, r2w_support=False):
     """Clean links and rewrite image URLs to Quora CDN inside the HTML body."""
     if not content_html:
         return ""
@@ -219,6 +219,19 @@ def process_html_content(content_html, folder_name):
         if href:
             a['href'] = clean_quora_url(href)
             
+    # Option: Reference 2 Wiki conversion for Wikipedia links
+    if r2w_support:
+        wiki_pattern = re.compile(r'^https?://([a-z0-9\-]+)\.wikipedia\.org/wiki/([^?#]+)', re.IGNORECASE)
+        for a in list(soup.find_all('a')):
+            href = a.get('href', '')
+            m = wiki_pattern.match(href)
+            if m:
+                lang = m.group(1)
+                slug = urllib.parse.unquote(m.group(2))
+                clean_text = a.get_text().strip()
+                r2w_syntax = f"[[{lang}|{slug}|{clean_text}]]"
+                a.replace_with(r2w_syntax)
+
     # 2. Rewrite image sources / attributes to Quora CDN
     for element in soup.find_all(True):
         for attr, val in list(element.attrs.items()):
@@ -586,7 +599,7 @@ def get_active_chrome_processes():
                 continue
     return active
 
-def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
+def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0, r2w_support=False):
     """Generate a valid WXR XML string from a list of post dictionaries."""
     site_title = f"Quora Export - {folder_name}"
     site_link = "https://quora.com"
@@ -652,7 +665,7 @@ def generate_wxr(posts, folder_name, quora_username=None, scrape_topics=True, sc
         import sys
         print(f"  [{idx}/{total_posts}] Converting: {title}", flush=True, file=sys.stderr)
         raw_content = post.get("Content", post.get("Post content", ""))
-        content = process_html_content(raw_content, folder_name)
+        content = process_html_content(raw_content, folder_name, r2w_support=r2w_support)
         
         # Dates
         raw_date = post.get("Creation time", post.get("Last updated", post.get("Time", "")))
@@ -1039,7 +1052,7 @@ def process_html_soup_to_posts(soup, include_drafts, include_space_posts):
         
     return posts
 
-def process_folder(folder_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
+def process_folder(folder_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0, r2w_support=False):
     """Parse index.html in the folder and return the WXR XML content if posts found."""
     folder_name = os.path.basename(folder_path)
     index_path = os.path.join(folder_path, "index.html")
@@ -1054,10 +1067,10 @@ def process_folder(folder_path, include_drafts, include_space_posts, quora_usern
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length, r2w_support=r2w_support)
     return wxr_content, len(posts)
 
-def process_zip(zip_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
+def process_zip(zip_path, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, output_file=None, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0, r2w_support=False):
     """Parse index.html in the zip file and return the WXR XML content if posts found."""
     folder_name = os.path.splitext(os.path.basename(zip_path))[0]
     
@@ -1081,10 +1094,10 @@ def process_zip(zip_path, include_drafts, include_space_posts, quora_username=No
     if not posts:
         return None, 0
         
-    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length)
+    wxr_content = generate_wxr(posts, folder_name, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length, r2w_support=r2w_support)
     return wxr_content, len(posts)
 
-def run_conversion(input_path, output_dir, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0):
+def run_conversion(input_path, output_dir, include_drafts, include_space_posts, quora_username=None, scrape_topics=True, scrape_comments=False, test_mode=False, max_processes=3, link_position="none", link_template='<a href="$link$" target="_blank">voir sur Quora</a>', min_content_length=0, r2w_support=False):
     """Processes input_path (which can be a single zip, single folder, or dir of folders/zips) and saves WXR to output_dir."""
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Error: Input path '{input_path}' does not exist.")
@@ -1127,7 +1140,7 @@ def run_conversion(input_path, output_dir, include_drafts, include_space_posts, 
                 folder_name = os.path.splitext(name)[0]
                 output_file = os.path.join(output_dir, f"{folder_name}.xml")
                 wxr_content, post_count = process_zip(
-                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length
+                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length, r2w_support=r2w_support
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:
@@ -1144,7 +1157,7 @@ def run_conversion(input_path, output_dir, include_drafts, include_space_posts, 
             try:
                 output_file = os.path.join(output_dir, f"{name}.xml")
                 wxr_content, post_count = process_folder(
-                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length
+                    path, include_drafts, include_space_posts, quora_username, scrape_topics, scrape_comments, test_mode, max_processes, output_file=output_file, link_position=link_position, link_template=link_template, min_content_length=min_content_length, r2w_support=r2w_support
                 )
                 if post_count > 0:
                     with open(output_file, "w", encoding="utf-8", errors="replace") as f:

@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
     "include_drafts": True,
     "include_space_posts": True,
     "min_content_length": 0,
+    "r2w_support": False,
     "scrape_topics": True,
     "scrape_comments": False,
     "test_mode": False
@@ -148,6 +149,8 @@ def convert():
                     
             if data.get('min_content_length') and int(data.get('min_content_length', 0)) > 0:
                 cmd.extend(['--min-content-length', str(data['min_content_length'])])
+
+            cmd.extend(['--r2w-support', 'true' if data.get('r2w_support', False) else 'false'])
 
             if data.get('test_mode'):
                 cmd.append('--test')

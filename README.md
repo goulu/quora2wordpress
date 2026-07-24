@@ -50,6 +50,7 @@ Available options:
 * `--include-space-posts`: Include space posts and shares (`True` or `False`, default: `True`)
 * `--quora-username`: Quora profile username slug (e.g. `Dr-Goulu`) to reconstruct valid answer URLs (default: derived from folder name)
 * `--min-content-length`: Seuil minimal de caractères de texte brut sous lequel un article publié est converti en brouillon (`int`, default: `0`)
+* `--r2w-support`: Convert Wikipedia links to Reference 2 Wiki syntax `[[lang|article|text]]` (`True` or `False`, default: `False`)
 * `--scrape-topics`: Automatically retrieve Quora tags/topics for each converted post (`True` or `False`, default: `True`)
 * `--scrape-comments`: Automatically retrieve comments and nested replies for each converted post (`True` or `False`, default: `False`)
 * `--link-position`: Position to insert backlink to Quora in post content (`none`, `top`, or `bottom`, default: `none`)
